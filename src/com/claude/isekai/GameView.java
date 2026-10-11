@@ -3751,61 +3751,195 @@ public class GameView extends View implements Runnable {
         int min = Math.min(3, this.lvl[1] / 25);
         float f = this.hu * ((min * 0.06f) + 0.7f);
         int i = min >= 3 ? -4158721 : min >= 2 ? -8592501 : min >= 1 ? -14246 : -8398593;
-        this.p.setColor(i);
-        this.p.setAlpha((int) ((Math.sin(this.time * 5.0f) * 14.0d) + 28.0d));
-        canvas.drawCircle(famX, famY, 4.8f * f, this.p);
-        this.p.setAlpha(255);
-        for (int i2 = 3; i2 >= 1; i2--) {
+        int light = heroMix(i, -1, 0.55f);
+        int dark = heroMix(i, -15331286, 0.35f);
+        float t = this.time;
+        float fr = heroFrenzyK();
+        // freshest familiar shot -> recoil + muzzle flash
+        float shot = 0.0f;
+        for (int k = 0; k < this.famShots.size(); k++) {
+            Fx fx = this.famShots.get(k);
+            if (fx != null && fx.life < 0.14f) {
+                shot = Math.max(shot, 1.0f - (Math.max(0.0f, fx.life) / 0.14f));
+            }
+        }
+        float dx = this.mobX - famX;
+        float dy = this.mobY - famY;
+        float len = (float) Math.sqrt((dx * dx) + (dy * dy));
+        float ux = len > 1.0f ? dx / len : 1.0f;
+        float uy = len > 1.0f ? dy / len : 0.0f;
+        float bx = famX - (ux * shot * 1.5f * f);
+        float by = famY - (uy * shot * 1.5f * f);
+        // soft shadow on the ground, smaller and fainter the higher it floats
+        float alt = (this.groundY - famY) / Math.max(1.0f, this.hu * 25.0f);
+        float sk = Math.max(0.3f, 1.6f - (0.7f * alt));
+        heroShadow(canvas, famX, this.groundY + (f * 0.2f), 4.0f * f * sk, f * sk, (int) (110.0f * sk));
+        // halo
+        float pulse = (float) Math.sin(t * 5.0f);
+        float hr = ((0.7f * pulse) + 6.5f + (3.0f * shot)) * f;
+        heroGlow(canvas, 3, i, bx, by, hr, hr, (int) ((25.0f * pulse) + 120.0f + (110.0f * shot)));
+        // fairy-dust trail shed from the tail (spawn point = where the familiar was when it was shed)
+        for (int k2 = 0; k2 < 7; k2++) {
+            float ph = ((t * 0.85f) + (k2 / 7.0f)) % 1.0f;
+            float t0 = t - (ph / 0.85f);
+            float px = (this.heroX - (this.hu * 9.0f)) + (((float) Math.sin(t0 * 1.3f)) * this.hu * 2.0f) + (((ph * 4.5f) + 1.5f) * f) + (((float) Math.sin((t0 * 7.0f) + k2)) * f * 0.8f);
+            float py = (this.groundY - (this.hu * 25.0f)) + (((float) Math.sin(t0 * SUPER_END)) * this.hu * 2.5f) + (((ph * 6.0f) + 1.5f) * f);
+            float s = f * 0.85f * (1.0f - ph);
+            int a = (int) ((1.0f - ph) * 230.0f * ((((float) Math.sin((t * 14.0f) + (k2 * 2.1f))) * 0.4f) + 0.6f));
+            if ((k2 & 1) == 0) {
+                heroSpark(canvas, px, py, s * 1.3f, light, a);
+            } else {
+                this.heroPixP.setColor(light);
+                this.heroPixP.setAlpha(a);
+                canvas.drawRect(px - (s * 0.4f), py - (s * 0.4f), px + (s * 0.4f), py + (s * 0.4f), this.heroPixP);
+            }
+        }
+        // wispy tail, 4 waving segments
+        for (int i2 = 4; i2 >= 1; i2--) {
             float f2 = i2;
-            float f3 = f2 * f;
-            this.p.setColor(i);
-            this.p.setAlpha(255 - (i2 * 55));
-            canvas.drawCircle((1.3f * f3) + famX + (((float) Math.sin((this.time * 6.0f) + f2)) * f * 0.5f), (f3 * 0.9f) + famY, (2.2f - (f2 * 0.45f)) * f, this.p);
+            float f3 = f2 * f * 0.85f;
+            this.heroFxP.setColor(i);
+            this.heroFxP.setAlpha(255 - (i2 * 48));
+            canvas.drawCircle(bx + (1.3f * f3) + (((float) Math.sin((t * 6.0f) + (f2 * 0.9f))) * f * 0.6f), by + (f3 * 0.9f) + (((float) Math.cos((t * 5.0f) + f2)) * f * 0.25f), (2.35f - (f2 * 0.42f)) * f, this.heroFxP);
         }
-        this.p.setAlpha(255);
-        Path path = new Path();
-        this.p.setColor(i);
+        // translucent fairy wings, flapping
+        float flap = (float) Math.sin(t * 17.0f);
+        this.heroLineP.setStrokeWidth(f * 0.35f);
+        for (int side = -1; side <= 1; side += 2) {
+            this.heroPath.reset();
+            this.heroPath.moveTo(bx + (side * 2.0f * f), by - (0.6f * f));
+            this.heroPath.lineTo(bx + (side * 6.2f * f), by - ((3.4f - (flap * 2.0f)) * f));
+            this.heroPath.lineTo(bx + (side * 5.6f * f), by + (((flap * 0.6f) + 0.4f) * f));
+            this.heroPath.lineTo(bx + (side * 2.2f * f), by + f);
+            this.heroPath.close();
+            this.heroFxP.setColor(light);
+            this.heroFxP.setAlpha(120);
+            canvas.drawPath(this.heroPath, this.heroFxP);
+            this.heroLineP.setColor(-1);
+            this.heroLineP.setAlpha(190);
+            canvas.drawPath(this.heroPath, this.heroLineP);
+        }
+        // body squash & stretch: stretches with vertical speed, squashes on recoil
+        float vel = Math.abs((float) Math.cos(t * SUPER_END));
+        canvas.save();
+        canvas.scale((1.0f - (0.05f * vel)) + (0.16f * shot), ((0.07f * vel) + 1.0f) - (0.12f * shot), bx, by);
+        // ears (outlined, inner shade, one twitches now and then)
+        boolean tw = t % 3.1f < 0.16f;
+        float tdx = tw ? 0.7f * f : 0.0f;
+        float tdy = tw ? 0.9f * f : 0.0f;
         float f4 = SUPER_END * f;
-        float f5 = 1.6f * f;
-        float f6 = famY - f5;
-        path.moveTo(famX - f4, f6);
+        float f6 = by - (1.6f * f);
         float f7 = 2.2f * f;
-        float f8 = famY - (4.4f * f);
-        path.lineTo(famX - f7, f8);
+        float f8 = by - (4.4f * f);
         float f9 = 0.6f * f;
-        float f10 = famY - (2.8f * f);
-        path.lineTo(famX - f9, f10);
-        path.close();
-        path.moveTo(f4 + famX, f6);
-        path.lineTo(f7 + famX, f8);
-        path.lineTo(famX + f9, f10);
-        path.close();
-        canvas.drawPath(path, this.p);
-        this.p.setColor(-15331286);
-        canvas.drawCircle(famX, famY, 3.3f * f, this.p);
-        this.p.setColor(i);
-        canvas.drawCircle(famX, famY, 3.0f * f, this.p);
-        this.p.setColor(1442840575);
+        float f10 = by - (2.8f * f);
+        this.heroPath.reset();
+        this.heroPath.moveTo(bx - f4, f6);
+        this.heroPath.lineTo((bx - f7) + tdx, f8 + tdy);
+        this.heroPath.lineTo(bx - f9, f10);
+        this.heroPath.close();
+        this.heroPath.moveTo(bx + f4, f6);
+        this.heroPath.lineTo(bx + f7, f8);
+        this.heroPath.lineTo(bx + f9, f10);
+        this.heroPath.close();
+        this.heroLineP.setStrokeWidth(0.6f * f);
+        this.heroLineP.setColor(-15331286);
+        canvas.drawPath(this.heroPath, this.heroLineP);
+        this.heroFxP.setColor(i);
+        canvas.drawPath(this.heroPath, this.heroFxP);
+        this.heroPath.reset();
+        this.heroPath.moveTo(bx - (2.0f * f), by - (2.1f * f));
+        this.heroPath.lineTo((bx - (2.05f * f)) + (tdx * 0.8f), (by - (3.6f * f)) + (tdy * 0.8f));
+        this.heroPath.lineTo(bx - (1.15f * f), by - (2.7f * f));
+        this.heroPath.close();
+        this.heroPath.moveTo(bx + (2.0f * f), by - (2.1f * f));
+        this.heroPath.lineTo(bx + (2.05f * f), by - (3.6f * f));
+        this.heroPath.lineTo(bx + (1.15f * f), by - (2.7f * f));
+        this.heroPath.close();
+        this.heroFxP.setColor(dark);
+        canvas.drawPath(this.heroPath, this.heroFxP);
+        // body: dark rim, shaded crescent, main tone, soft + hard highlight
+        this.heroFxP.setColor(-15331286);
+        canvas.drawCircle(bx, by, 3.3f * f, this.heroFxP);
+        this.heroFxP.setColor(dark);
+        canvas.drawCircle(bx, by, 3.0f * f, this.heroFxP);
+        this.heroFxP.setColor(i);
+        canvas.drawCircle(bx - (0.3f * f), by - (0.4f * f), 2.6f * f, this.heroFxP);
+        this.heroFxP.setColor(1442840575);
         float f11 = 1.1f * f;
-        canvas.drawCircle(famX - f11, famY - (IMPACT * f), f11, this.p);
-        boolean z = this.time % 3.5f < 0.12f;
-        this.p.setColor(-15331286);
-        if (z) {
-            float f12 = famY - (0.1f * f);
+        canvas.drawCircle(bx - f11, by - (IMPACT * f), f11, this.heroFxP);
+        this.heroPixP.setColor(-1);
+        this.heroPixP.setAlpha(225);
+        canvas.drawRect(bx - (1.75f * f), by - (1.95f * f), bx - (1.15f * f), by - (1.35f * f), this.heroPixP);
+        // blush
+        this.heroFxP.setColor(-32856);
+        this.heroFxP.setAlpha(115);
+        this.heroR.set(bx - (2.45f * f), by + (0.65f * f), bx - (1.35f * f), by + (1.15f * f));
+        canvas.drawOval(this.heroR, this.heroFxP);
+        this.heroR.set(bx + (1.35f * f), by + (0.65f * f), bx + (2.45f * f), by + (1.15f * f));
+        canvas.drawOval(this.heroR, this.heroFxP);
+        // eyes: blink / squint on shot, happy ^^ in frenzy, otherwise glancing at the monster
+        boolean z = t % 3.5f < 0.12f;
+        this.heroFxP.setColor(-15331286);
+        if (z || shot > 0.35f) {
+            float f12 = by - (0.1f * f);
             float f13 = f * 0.5f;
-            float f14 = famY + (f * 0.35f);
-            canvas.drawRect(famX - f5, f12, famX - f13, f14, this.p);
-            canvas.drawRect(famX + f13, f12, famX + f5, f14, this.p);
-            return;
+            float f14 = by + (f * 0.35f);
+            float f5 = 1.6f * f;
+            canvas.drawRect(bx - f5, f12, bx - f13, f14, this.heroFxP);
+            canvas.drawRect(bx + f13, f12, bx + f5, f14, this.heroFxP);
+        } else if (fr > 0.0f) {
+            this.heroLineP.setStrokeWidth(0.42f * f);
+            this.heroLineP.setColor(-15331286);
+            for (int side2 = -1; side2 <= 1; side2 += 2) {
+                float ex = bx + (side2 * 1.05f * f);
+                this.heroPath.reset();
+                this.heroPath.moveTo(ex - (0.6f * f), by + (0.25f * f));
+                this.heroPath.lineTo(ex, by - (0.35f * f));
+                this.heroPath.lineTo(ex + (0.6f * f), by + (0.25f * f));
+                canvas.drawPath(this.heroPath, this.heroLineP);
+            }
+        } else {
+            float gx = ux * 0.18f * f;
+            float gy = uy * 0.12f * f;
+            float f15 = 1.05f * f;
+            canvas.drawCircle((bx - f15) + gx, by + gy, f9, this.heroFxP);
+            canvas.drawCircle(bx + f15 + gx, by + gy, f9, this.heroFxP);
+            this.heroFxP.setColor(-1);
+            float f16 = (by - (0.25f * f)) + gy;
+            float f17 = 0.22f * f;
+            canvas.drawCircle((bx - (0.85f * f)) + gx, f16, f17, this.heroFxP);
+            canvas.drawCircle(bx + (f * 1.25f) + gx, f16, f17, this.heroFxP);
         }
-        float f15 = 1.05f * f;
-        canvas.drawCircle(famX - f15, famY, f9, this.p);
-        canvas.drawCircle(f15 + famX, famY, f9, this.p);
-        this.p.setColor(-1);
-        float f16 = famY - (0.25f * f);
-        float f17 = 0.22f * f;
-        canvas.drawCircle(famX - (0.85f * f), f16, f17, this.p);
-        canvas.drawCircle(famX + (f * 1.25f), f16, f17, this.p);
+        if (shot > 0.2f) {
+            this.heroFxP.setColor(-15331286);
+            canvas.drawCircle(bx + (ux * 0.3f * f), by + (1.15f * f), ((0.35f * shot) + 0.12f) * f, this.heroFxP);
+        }
+        canvas.restore();
+        // tier ornaments: halo at tier 2+, orbiting star at tier 3
+        if (min >= 2) {
+            float hy = (by - (5.0f * f)) + (((float) Math.sin(t * 3.0f)) * 0.25f * f);
+            this.heroR.set(bx - (2.0f * f), hy - (0.55f * f), bx + (2.0f * f), hy + (0.55f * f));
+            this.heroLineP.setStrokeWidth(0.5f * f);
+            this.heroLineP.setColor(0xFFFFE27A);
+            this.heroLineP.setAlpha(((int) (pulse * 25.0f)) + 205);
+            canvas.drawOval(this.heroR, this.heroLineP);
+        }
+        if (min >= 3) {
+            double oa = t * 2.4d;
+            heroSpark(canvas, bx + (((float) Math.cos(oa)) * 5.2f * f), (by + (((float) Math.sin(oa)) * 1.8f * f)) - (0.6f * f), 0.9f * f, 0xFFFFE27A, 235);
+        }
+        // muzzle flash toward the monster
+        if (shot > 0.0f) {
+            float mx = bx + (ux * 3.6f * f);
+            float my = by + (uy * 3.6f * f);
+            float mr = ((4.0f * shot) + 2.5f) * f;
+            heroGlow(canvas, 5, -1, mx, my, mr, mr, (int) (240.0f * shot));
+            this.heroLineP.setStrokeWidth(0.45f * f);
+            this.heroLineP.setColor(light);
+            this.heroLineP.setAlpha((int) (220.0f * shot));
+            canvas.drawCircle(mx, my, (((1.0f - shot) * 5.0f) + 1.5f) * f, this.heroLineP);
+        }
     }
 
     void drawFit(Canvas canvas, String str, float f, float f2, float f3) {
@@ -4085,30 +4219,440 @@ public class GameView extends View implements Runnable {
         drawFit(canvas, str2, f8 * 2.0f, 0.9f * this.headerB, this.W - (f8 * 4.0f));
     }
 
+    // ===== gfx(hero): caches & helpers for the hero / familiar / princess (all allocation happens here, never per frame) =====
+    final Paint heroGlowP = new Paint(1);
+    final Paint heroShP = heroShaderPaint(new RadialGradient(0.0f, 0.0f, 100.0f,
+            new int[]{0xA8000000, 0x70000000, 0x2A000000, 0x00000000}, new float[]{0.0f, 0.4f, 0.75f, 1.0f}, Shader.TileMode.CLAMP));
+    final Paint heroFxP = new Paint(1);
+    final Paint heroPixP = new Paint();
+    final Paint heroLineP = heroStrokePaint();
+    final Paint heroSilP = heroBitmapPaint();
+    final Path heroPath = new Path();
+    final Path heroRays = heroRayPath(12, 0.065f);
+    final RectF heroR = new RectF();
+    final RadialGradient[] heroGrad = new RadialGradient[8];
+    final int[] heroGradKey = new int[8];
+    final PorterDuffColorFilter[] heroCfs = new PorterDuffColorFilter[6];
+    final int[] heroCfKey = new int[6];
+    static final int[] heroCompGlow = {0xFFFF6FB5, 0xFF9FD4FF, 0xFFFFB04A, 0xFF86E08F, 0xFFFFD36B};
+    static final float[] heroDirX = {1.0f, 0.5f, -0.5f, -1.0f, -0.5f, 0.5f};
+    static final float[] heroDirY = {0.0f, 0.866f, 0.866f, 0.0f, -0.866f, -0.866f};
+    float heroBubbleLast;
+    float heroBubbleBorn = -99.0f;
+
+    static Paint heroShaderPaint(Shader shader) {
+        Paint paint = new Paint(1);
+        paint.setShader(shader);
+        return paint;
+    }
+
+    static Paint heroStrokePaint() {
+        Paint paint = new Paint(1);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeJoin(Paint.Join.ROUND);
+        paint.setStrokeCap(Paint.Cap.ROUND);
+        return paint;
+    }
+
+    static Paint heroBitmapPaint() {
+        Paint paint = new Paint();
+        paint.setFilterBitmap(false);
+        return paint;
+    }
+
+    static Path heroRayPath(int n, float half) {
+        Path path = new Path();
+        for (int k = 0; k < n; k++) {
+            double a = (k * 6.283185307179586d) / n;
+            path.moveTo(0.0f, 0.0f);
+            path.lineTo((float) (Math.cos(a - half) * 100.0d), (float) (Math.sin(a - half) * 100.0d));
+            path.lineTo((float) (Math.cos(a + half) * 100.0d), (float) (Math.sin(a + half) * 100.0d));
+            path.close();
+        }
+        return path;
+    }
+
+    static float heroHash(int n) {
+        int h = n * 374761393 + 668265263;
+        h = (h ^ (h >>> 13)) * 1274126177;
+        h ^= h >>> 16;
+        return (h & 16777215) / 16777216.0f;
+    }
+
+    static int heroMix(int a, int b, float k) {
+        int ar = (a >> 16) & 255;
+        int ag = (a >> 8) & 255;
+        int ab = a & 255;
+        return -16777216 | (((int) (ar + ((((b >> 16) & 255) - ar) * k))) << 16) | (((int) (ag + ((((b >> 8) & 255) - ag) * k))) << 8) | ((int) (ab + (((b & 255) - ab) * k)));
+    }
+
+    static float heroBackOut(float x) {
+        float y = x - 1.0f;
+        return 1.0f + (2.70158f * y * y * y) + (1.70158f * y * y);
+    }
+
+    static float heroDashK(float t) {
+        if (t < 0.3f) {
+            return 0.0f;
+        }
+        if (t < 0.45f) {
+            return (t - 0.3f) / 0.15f;
+        }
+        if (t < 1.75f) {
+            return 1.0f;
+        }
+        return Math.max(0.0f, 1.0f - ((t - 1.75f) / 0.4f));
+    }
+
+    static float heroLungeK(float c) {
+        if (!(c > 0.0f)) {
+            return 0.0f;
+        }
+        float x = Math.min(1.0f, c);
+        return x * x * (3.0f - (2.0f * x));
+    }
+
+    float heroFrenzyK() {
+        long left = this.frenzyUntil - SystemClock.uptimeMillis();
+        if (left <= 0) {
+            return 0.0f;
+        }
+        float k = Math.min(1.0f, left / 500.0f);
+        if (left < 2000 && (((int) (this.time * 8.0f)) & 1) == 0) {
+            k *= 0.5f;
+        }
+        return k;
+    }
+
+    int heroStaffColor(float fr) {
+        if (fr > 0.0f) {
+            return 0xFFFF7A1E;
+        }
+        int i = this.lifeStageIdx;
+        return i == 0 ? -5720 : i >= 4 ? -5213953 : -19906;
+    }
+
+    RadialGradient heroGradient(int slot, int color) {
+        if (this.heroGrad[slot] == null || this.heroGradKey[slot] != color) {
+            int rgb = color & 16777215;
+            this.heroGrad[slot] = new RadialGradient(0.0f, 0.0f, 100.0f, new int[]{-16777216 | rgb, -1728053248 | rgb, 939524096 | rgb, rgb}, new float[]{0.0f, 0.35f, 0.7f, 1.0f}, Shader.TileMode.CLAMP);
+            this.heroGradKey[slot] = color;
+        }
+        return this.heroGrad[slot];
+    }
+
+    void heroGlow(Canvas c, int slot, int color, float x, float y, float rx, float ry, int alpha) {
+        if (!(rx > 0.5f) || !(ry > 0.5f) || alpha <= 0) {
+            return;
+        }
+        this.heroGlowP.setShader(heroGradient(slot, color));
+        this.heroGlowP.setAlpha(Math.min(255, alpha));
+        c.save();
+        c.translate(x, y);
+        c.scale(rx / 100.0f, ry / 100.0f);
+        c.drawCircle(0.0f, 0.0f, 100.0f, this.heroGlowP);
+        c.restore();
+    }
+
+    void heroShadow(Canvas c, float x, float y, float rx, float ry, int alpha) {
+        if (!(rx > 0.5f) || !(ry > 0.5f) || alpha <= 0) {
+            return;
+        }
+        this.heroShP.setAlpha(Math.min(255, alpha));
+        c.save();
+        c.translate(x, y);
+        c.scale(rx / 100.0f, ry / 100.0f);
+        c.drawCircle(0.0f, 0.0f, 100.0f, this.heroShP);
+        c.restore();
+        this.heroFxP.setColor(-16777216);
+        this.heroFxP.setAlpha(Math.min(255, alpha) / 4);
+        this.heroR.set(x - (rx * 0.5f), y - (ry * 0.5f), x + (rx * 0.5f), y + (ry * 0.5f));
+        c.drawOval(this.heroR, this.heroFxP);
+    }
+
+    void heroSilhouette(Canvas c, Bitmap b, float x, float y, float s, float sx, float sy, int slot, int color, int alpha) {
+        if (b == null || alpha <= 0) {
+            return;
+        }
+        if (this.heroCfs[slot] == null || this.heroCfKey[slot] != color) {
+            this.heroCfs[slot] = new PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN);
+            this.heroCfKey[slot] = color;
+        }
+        this.heroSilP.setColorFilter(this.heroCfs[slot]);
+        this.heroSilP.setAlpha(Math.min(255, alpha));
+        blit(c, b, x, y, s, sx, sy, this.heroSilP);
+    }
+
+    void heroSpark(Canvas c, float x, float y, float s, int color, int alpha) {
+        if (!(s > 0.3f) || alpha <= 0) {
+            return;
+        }
+        int a = Math.min(255, alpha);
+        float t = Math.max(1.0f, s * 0.36f) * 0.5f;
+        this.heroPixP.setColor(color);
+        this.heroPixP.setAlpha(a);
+        c.drawRect(x - s, y - t, x + s, y + t, this.heroPixP);
+        c.drawRect(x - t, y - s, x + t, y - t, this.heroPixP);
+        c.drawRect(x - t, y + t, x + t, y + s, this.heroPixP);
+        this.heroPixP.setColor(-1);
+        this.heroPixP.setAlpha(a);
+        c.drawRect(x - t, y - t, x + t, y + t, this.heroPixP);
+    }
+
+    void heroHeartShape(Canvas c, float x, float y, float u, Paint paint) {
+        c.drawRect(x - (2.5f * u), y - (3.0f * u), x - (0.5f * u), y - (2.0f * u), paint);
+        c.drawRect(x + (0.5f * u), y - (3.0f * u), x + (2.5f * u), y - (2.0f * u), paint);
+        c.drawRect(x - (3.5f * u), y - (2.0f * u), x + (3.5f * u), y, paint);
+        c.drawRect(x - (2.5f * u), y, x + (2.5f * u), y + u, paint);
+        c.drawRect(x - (1.5f * u), y + u, x + (1.5f * u), y + (2.0f * u), paint);
+        c.drawRect(x - (0.5f * u), y + (2.0f * u), x + (0.5f * u), y + (3.0f * u), paint);
+    }
+
+    void heroHeart(Canvas c, float x, float y, float u, int color, int alpha) {
+        if (!(u > 0.2f) || alpha <= 0) {
+            return;
+        }
+        int a = Math.min(255, alpha);
+        this.heroPixP.setColor(-15331286);
+        this.heroPixP.setAlpha((a * 3) / 5);
+        heroHeartShape(c, x + u, y + u, u, this.heroPixP);
+        this.heroPixP.setColor(color);
+        this.heroPixP.setAlpha(a);
+        heroHeartShape(c, x, y, u, this.heroPixP);
+        this.heroPixP.setColor(-1);
+        this.heroPixP.setAlpha(a);
+        c.drawRect(x - (2.5f * u), y - (2.0f * u), x - (1.5f * u), y - u, this.heroPixP);
+    }
+
+    void heroGround(Canvas c, float f, float x, float lift, float shA, float shW) {
+        float g = this.groundY;
+        float h = Math.min(1.0f, lift / Math.max(1.0f, this.hu * 16.0f));
+        float k = 1.0f - (h * 0.55f);
+        float cast = this.heroCast;
+        float fr = heroFrenzyK();
+        heroShadow(c, x, g + (f * 0.2f), 11.5f * f * shW * k, 2.5f * f * k, (int) (255.0f * shA * (1.0f - (h * 0.6f))));
+        float lk = heroLungeK(cast);
+        float pool = ((cast * 120.0f) + 75.0f + (((float) Math.sin(this.time * 5.0f)) * 18.0f)) * (1.0f - h) * shA;
+        heroGlow(c, 1, heroStaffColor(fr), x + ((11.0f + (lk * 2.6f)) * f), g + (f * 0.3f), ((cast * 3.0f) + 12.0f) * f, ((cast * 0.6f) + 2.4f) * f, (int) pool);
+        if (fr > 0.0f) {
+            heroGlow(c, 2, 0xFFFF6A1A, x, g + (f * 0.3f), (((float) Math.sin(this.time * 11.0f)) + 15.0f) * f, 3.2f * f, (int) (180.0f * fr * (1.0f - h)));
+        }
+        if (rhythmOn() && this.beatPulse > 0.01f) {
+            float b = this.beatPulse;
+            float rx = (((1.0f - b) * 9.0f) + 7.0f) * f;
+            this.heroR.set(x - rx, g - (rx * 0.2f), x + rx, g + (rx * 0.2f));
+            this.heroLineP.setStrokeWidth(f * 0.6f);
+            this.heroLineP.setColor(-45149);
+            this.heroLineP.setAlpha((int) (b * 170.0f));
+            c.drawOval(this.heroR, this.heroLineP);
+        }
+    }
+
+    void heroDashTrail(Canvas c, Bitmap b, float f, float span, float d0) {
+        int gc = heroMix(ROBE[this.lifeStageIdx], -1, 0.35f);
+        for (int k = 4; k >= 1; k--) {
+            float dk = heroDashK(this.superT - (k * 0.035f));
+            if (Math.abs(dk - d0) >= 0.01f) {
+                heroSilhouette(c, b, this.heroX + (span * dk), this.groundY + f, f, 1.0f, 1.0f, 2, gc, (int) ((1.0f - (k / 5.0f)) * 170.0f));
+            }
+        }
+        float d1 = heroDashK(this.superT - 0.14f);
+        if (Math.abs(d1 - d0) > 0.02f) {
+            float xa = this.heroX + (span * Math.min(d0, d1));
+            float xb = this.heroX + (span * Math.max(d0, d1));
+            for (int k2 = 0; k2 < 6; k2++) {
+                float ly = this.groundY - (((k2 * 3.6f) + 2.5f) * f);
+                float in = (xb - xa) * 0.35f * heroHash((k2 * 7) + 3);
+                this.heroPixP.setColor(k2 % 2 == 0 ? -1 : gc);
+                this.heroPixP.setAlpha(170 - (k2 * 12));
+                c.drawRect(xa + in, ly, xb - (in * 0.3f), ly + (f * 0.55f), this.heroPixP);
+            }
+        }
+    }
+
+    void heroFlames(Canvas c, float cx, float base, float u, float bh, float fr) {
+        if (!(u > 0.0f) || !(bh > 0.0f)) {
+            return;
+        }
+        int n = 15;
+        float colW = u * 1.75f;
+        float x0 = cx - ((n * colW) * 0.5f);
+        for (int layer = 0; layer < 3; layer++) {
+            float hs = layer == 0 ? 1.0f : layer == 1 ? 0.74f : 0.5f;
+            float lim = layer == 0 ? 1.01f : layer == 1 ? 0.8f : 0.58f;
+            this.heroPixP.setColor(layer == 0 ? 0xFFE8361E : layer == 1 ? 0xFFFF8A1F : 0xFFFFD84A);
+            this.heroPixP.setAlpha((int) ((layer == 0 ? 150 : layer == 1 ? 175 : 200) * fr));
+            for (int i = 0; i < n; i++) {
+                float rel = (((i + 0.5f) / n) * 2.0f) - 1.0f;
+                if (Math.abs(rel) <= lim) {
+                    float flick = (float) Math.sin((this.time * ((heroHash((i * 7) + layer) * 7.0f) + 9.0f)) + (i * 1.9f) + layer);
+                    float hgt = ((bh * 0.5f) + (bh * 0.8f * (1.0f - (rel * rel))) + (flick * u * 2.6f)) * hs;
+                    hgt = Math.round(hgt / u) * u;
+                    if (hgt > 0.0f) {
+                        c.drawRect(x0 + (i * colW), base - hgt, x0 + ((i + 1) * colW), base, this.heroPixP);
+                    }
+                }
+            }
+        }
+        for (int k = 0; k < 9; k++) {
+            float ph = ((this.time * ((heroHash((k * 13) + 5) * 0.6f) + 0.7f)) + heroHash((k * 31) + 1)) % 1.0f;
+            float ex = cx + ((heroHash((k * 17) + 3) - 0.5f) * bh * 1.15f) + (((float) Math.sin((this.time * 3.0f) + k)) * u * 1.5f);
+            float ey = (base - (bh * 0.3f)) - ((ph * bh) * 1.4f);
+            float es = u * (1.15f - (ph * 0.8f)) * 0.5f;
+            this.heroPixP.setColor(ph < 0.45f ? 0xFFFFE27A : 0xFFFF7A2A);
+            this.heroPixP.setAlpha((int) ((1.0f - ph) * 235.0f * fr));
+            c.drawRect(ex - es, ey - es, ex + es, ey + es, this.heroPixP);
+        }
+    }
+
+    void heroOrbMotes(Canvas c, float x, float y, float f, int sc, boolean front) {
+        int lc = heroMix(sc, -1, 0.55f);
+        for (int k = 0; k < 3; k++) {
+            double a = (this.time * 3.2d) + (k * 2.0944d);
+            float sn = (float) Math.sin(a);
+            if ((sn >= 0.0f) == front) {
+                float mx = x + (((float) Math.cos(a)) * 4.4f * f);
+                float my = (y + ((sn * 1.6f) * f)) - (0.4f * f);
+                float s = f * (front ? 0.55f : 0.4f);
+                this.heroPixP.setColor(lc);
+                this.heroPixP.setAlpha(front ? 240 : 150);
+                c.drawRect(mx - s, my - s, mx + s, my + s, this.heroPixP);
+            }
+        }
+    }
+
+    void heroStaff(Canvas c, float f, float f10, float cast, int sc, float fr) {
+        float x = this.heroX + (10.0f * f) + (f10 * 1.3f);
+        float y = (this.groundY - (24.0f * f)) - ((cast * f) * 2.0f);
+        float g = this.groundY;
+        float t = this.time;
+        float h15 = f * 1.5f;
+        float h05 = f * 0.5f;
+        Paint q = this.heroPixP;
+        q.setColor(-15331286);
+        c.drawRect(x - h15, y, x + h15, g + f, q);
+        q.setColor(-7644629);
+        c.drawRect(x - h05, y, x + h05, g, q);
+        q.setColor(0xFFB98048);
+        c.drawRect(x - h05, y + (f * 4.0f), x + h05, y + (f * 5.0f), q);
+        c.drawRect(x - h05, y + (f * 11.0f), x + h05, y + (f * 12.0f), q);
+        q.setColor(0xFF5A3020);
+        c.drawRect(x - h05, g - (f * 9.0f), x + h05, g - (f * 8.0f), q);
+        c.drawRect(x - h05, g - (f * 7.0f), x + h05, g - (f * 6.0f), q);
+        q.setColor(0xFFE8B83A);
+        c.drawRect(x - h15, y + (f * 2.5f), x + h15, y + (f * 3.5f), q);
+        q.setColor(0xFFFFF0B0);
+        c.drawRect(x - h15, y + (f * 2.5f), x - h05, y + (f * 3.5f), q);
+        float pulse = (float) Math.sin(t * 5.0f);
+        float rr = ((cast * 5.0f) + 7.0f + (0.6f * pulse)) * f;
+        heroGlow(c, 1, sc, x, y, rr, rr, (int) ((cast * 100.0f) + 140.0f + (25.0f * pulse)));
+        heroOrbMotes(c, x, y, f, sc, false);
+        if (fr > 0.0f) {
+            float fh = (((float) Math.sin(t * 17.0f)) + 2.2f) * f;
+            float fy = y - (2.5f * f);
+            q.setColor(0xFFE8361E);
+            q.setAlpha((int) (220.0f * fr));
+            c.drawRect(x - h15, fy - fh, x + h15, fy, q);
+            q.setColor(0xFFFFD84A);
+            q.setAlpha((int) (240.0f * fr));
+            c.drawRect(x - h05, (fy - (fh * 0.6f)) - (((float) Math.sin(t * 23.0f)) * f * 0.5f), x + h05, fy, q);
+        }
+        float h25 = f * 2.5f;
+        q.setColor(-15331286);
+        c.drawRect(x - h25, y - h25, x + h25, y + h25, q);
+        q.setColor(sc);
+        c.drawRect(x - h15, y - h15, x + h15, y + h15, q);
+        q.setColor(heroMix(sc, -15331286, 0.35f));
+        c.drawRect(x + h05, y + h05, x + h15, y + h15, q);
+        c.drawRect(x - h15, y + h05, x - h05, y + h15, q);
+        q.setColor(-1);
+        c.drawRect(x - h15, y - h15, x - h05, y - h05, q);
+        q.setColor(-1);
+        q.setAlpha(Math.min(255, (int) ((pulse * 70.0f) + 90.0f + (cast * 165.0f))));
+        c.drawRect(x - h05, y - h05, x + h05, y + h05, q);
+        heroOrbMotes(c, x, y, f, sc, true);
+        if (cast > 0.0f) {
+            float pr = 1.0f - cast;
+            this.heroLineP.setStrokeWidth(((1.3f * cast) + 0.5f) * f);
+            this.heroLineP.setColor(sc);
+            this.heroLineP.setAlpha((int) (235.0f * cast));
+            c.drawCircle(x, y, ((12.0f * pr) + 3.0f) * f, this.heroLineP);
+            this.heroLineP.setStrokeWidth(0.45f * f);
+            this.heroLineP.setColor(-1);
+            this.heroLineP.setAlpha((int) (200.0f * cast));
+            c.drawCircle(x, y, ((8.0f * pr) + 2.0f) * f, this.heroLineP);
+            for (int k = 0; k < 6; k++) {
+                float d = ((11.0f * pr) + 2.5f) * f;
+                float px = x + (heroDirX[k] * d);
+                float py = y + (heroDirY[k] * d * 0.8f);
+                float s = ((0.6f * cast) + 0.4f) * f * 0.5f;
+                q.setColor(k % 2 == 0 ? -1 : sc);
+                q.setAlpha((int) (255.0f * cast));
+                c.drawRect(px - s, py - s, px + s, py + s, q);
+            }
+            float fl = ((4.0f * cast) + 3.0f) * f;
+            heroGlow(c, 5, -1, x, y, fl, fl, (int) (210.0f * cast));
+        }
+        if (cast > 0.35f) {
+            float f31 = f * ((cast * 9.0f) + 3.0f);
+            float f32 = f * 0.7f;
+            q.setColor(-1);
+            q.setAlpha((int) (Math.min(1.0f, (cast - 0.35f) * 2.2f) * 255.0f));
+            c.drawRect(x - f31, y - f32, x + f31, y + f32, q);
+            c.drawRect(x - f32, y - f31, x + f32, y - f32, q);
+            c.drawRect(x - f32, y + f32, x + f32, y + f31, q);
+            q.setColor(sc);
+            q.setAlpha((int) (cast * 200.0f));
+            float f33 = f31 * 0.5f;
+            float f36 = f32 * 2.0f;
+            c.drawRect(x - f33, y - f33, (x - f33) + f36, (y - f33) + f36, q);
+            c.drawRect((x + f33) - f36, (y + f33) - f36, x + f33, y + f33, q);
+        }
+    }
     void drawHero(Canvas var1) {
-       var1.save();
-       if (this.isekaiT >= 0.0F) {
+       if (this.bmHero == null || this.bmHero[this.lifeStageIdx] == null) {
+          return;
+       }
+
+       Bitmap heroBmp = this.bmHero[this.lifeStageIdx];
+       float heroF = this.hu * ((float)this.lifeStageIdx * 0.05F + 0.8F);
+       float heroLift = 0.0F;
+       if (this.isekaiT >= 0.0F && this.bmTruck != null) {
           float var2 = (float)this.bmTruck.getWidth();
           float var3 = this.hu;
           var2 = Math.abs(this.truckX() - this.heroX) / (var2 * var3 * 1.6F * 0.9F);
           if (var2 < 1.0F) {
-             var1.translate(0.0F, -((float)Math.cos((double)var2 * Math.PI / 2.0)) * this.hu * 16.0F);
+             heroLift = (float)Math.cos((double)var2 * Math.PI / 2.0) * this.hu * 16.0F;
           }
        }
 
-       if (this.overlay == 11 && this.superType == 0) {
-          float var9 = this.superT;
-          if (var9 < 0.3F) {
-             var9 = 0.0F;
-          } else if (var9 < 0.45F) {
-             var9 = (var9 - 0.3F) / 0.15F;
-          } else if (var9 < 1.75F) {
-             var9 = 1.0F;
+       boolean heroDashing = this.overlay == 11 && this.superType == 0;
+       float heroDash = heroDashing ? heroDashK(this.superT) : 0.0F;
+       float heroSpan = this.mobX - this.heroX - this.mobR * 1.6F;
+       float heroShA = 1.0F;
+       float heroShW = 1.0F;
+       if (this.overlay == 6 && this.deathCrash) {
+          float var6 = this.deathT - 1.2F;
+          if (this.deathKind == 0) {
+             heroShA = Math.max(0.0F, 1.0F - var6 * 4.0F);
           } else {
-             var9 = Math.max(0.0F, 1.0F - (var9 - 1.75F) / 0.4F);
+             heroShW = 1.0F + 0.7F * Math.max(0.0F, Math.min(1.0F, var6 * 8.0F));
           }
+       }
 
-          var1.translate((this.mobX - this.heroX - this.mobR * 1.6F) * var9, 0.0F);
+       // ground layer stays on the ground: soft shadow, staff light pool, frenzy scorch, beat ring
+       this.heroGround(var1, heroF, this.heroX + heroSpan * heroDash, heroLift, heroShA, heroShW);
+       if (heroDashing) {
+          this.heroDashTrail(var1, heroBmp, heroF, heroSpan, heroDash);
+       }
+
+       var1.save();
+       if (heroLift != 0.0F) {
+          var1.translate(0.0F, -heroLift);
+       }
+
+       if (heroDashing) {
+          var1.translate(heroSpan * heroDash, 0.0F);
        }
 
        if (this.overlay == 6) {
@@ -4137,112 +4681,152 @@ public class GameView extends View implements Runnable {
        this.drawHeroInner(var1);
        var1.restore();
        if (this.overlay == 6 && !this.deathCrash && this.deathT > 0.4F) {
+          // "!" pops in with an overshoot, jitters and gets a dark drop shadow
+          float heroPop = Math.max(0.05F, heroBackOut(Math.min(1.0F, (this.deathT - 0.4F) / 0.18F)));
+          float heroEx = this.heroX + (float)Math.sin((double)(this.time * 47.0F)) * this.pad * 0.12F;
+          float heroEy = this.heroTop() - this.pad * 2.0F;
+          var1.save();
+          var1.scale(heroPop, heroPop, heroEx, heroEy);
           this.tp.setTextAlign(Align.CENTER);
           this.tp.setTextSize(this.pad * 4.0F);
           this.tp.setFakeBoldText(true);
+          this.tp.setColor(-15331286);
+          this.tp.setAlpha(190);
+          var1.drawText("!", heroEx + this.pad * 0.3F, heroEy + this.pad * 0.3F, this.tp);
           this.tp.setColor(-46518);
-          var1.drawText("!", this.heroX, this.heroTop() - this.pad * 2.0F, this.tp);
+          var1.drawText("!", heroEx, heroEy, this.tp);
           this.tp.setFakeBoldText(false);
+          var1.restore();
        }
     }
 
     void drawHeroInner(Canvas canvas) {
-        float f = this.hu * ((this.lifeStageIdx * 0.05f) + 0.8f);
-        float round = ((Math.round(Math.sin(this.time * 3.0f) * 1.2000000476837158d) * f) * 0.5f) - ((this.beatPulse * f) * IMPACT);
-        Bitmap[] bitmapArr = this.bmHero;
-        int i = this.lifeStageIdx;
-        Bitmap bitmap = bitmapArr[i];
-        if (i >= 3) {
-            this.p.setColor(ROBE[i]);
-            this.p.setAlpha((int) ((Math.sin(this.time * 4.0f) * 30.0d) + 45.0d));
-            canvas.drawCircle(this.heroX, this.groundY - ((bitmap.getHeight() * f) * 0.45f), bitmap.getHeight() * f * 0.7f, this.p);
-            this.p.setAlpha(255);
+        int stage = this.lifeStageIdx;
+        Bitmap bitmap = this.bmHero[stage];
+        if (bitmap == null) {
+            return;
         }
-        this.p.setColor(1426063360);
-        RectF rectF = this.r;
-        float f2 = this.heroX;
-        float f3 = f * 7.0f;
-        float f4 = this.groundY;
-        rectF.set(f2 - f3, f4 - f, f2 + f3, f4 + f);
-        canvas.drawOval(this.r, this.p);
-        int i2 = this.lifeStageIdx;
-        this.p.setColor(i2 == 0 ? -5720 : i2 >= 4 ? -5213953 : -19906);
-        this.p.setAlpha((int) ((this.heroCast * 50.0f) + 30.0f + (Math.sin(this.time * 5.0f) * 10.0d)));
-        RectF rectF2 = this.r;
-        float f5 = this.heroX;
-        float f6 = this.groundY;
-        float f7 = 1.8f * f;
-        rectF2.set((f * 2.0f) + f5, f6 - f7, f5 + (22.0f * f), f6 + f7);
-        canvas.drawOval(this.r, this.p);
-        this.p.setAlpha(255);
-        float f8 = this.heroCast;
-        float f9 = 0.06f * f8;
-        float f10 = f8 * f * 1.6f;
-        float f11 = 1.0f - f9;
-        blit(canvas, bitmap, this.heroX + f10, this.groundY + f + round, f, f9 + 1.0f, f11, this.bp);
+        float f = this.hu * ((stage * 0.05f) + 0.8f);
+        float round = ((Math.round(Math.sin(this.time * 3.0f) * 1.2000000476837158d) * f) * 0.5f) - ((this.beatPulse * f) * IMPACT);
+        float cast = this.heroCast;
+        float fr = heroFrenzyK();
+        float lk = heroLungeK(cast);
+        float bh = bitmap.getHeight() * f;
+        // breathing (faster & heavier while enraged) on top of the old cast squash
+        float br = (float) Math.sin(this.time * (fr > 0.0f ? 4.6f : 2.2f));
+        float sx = ((0.06f * cast) + 1.0f) * (1.0f - (0.014f * br));
+        float sy = (1.0f - (0.06f * cast)) * ((0.024f * br) + 1.0f);
+        float f10 = lk * f * 2.0f;
+        float cx = this.heroX + f10;
+        float foot = this.groundY + f + round;
+        float mid = this.groundY - (bh * 0.45f);
+        int sc = heroStaffColor(fr);
+        // 1. life-stage aura: soft halo, plus rotating god-rays for the late stages
+        if (stage >= 3) {
+            int rc = heroMix(ROBE[stage], -1, 0.3f);
+            float pulse = (float) Math.sin(this.time * 2.4f);
+            if (stage >= 4) {
+                float rr = (bh * ((0.06f * pulse) + 1.15f)) / 100.0f;
+                this.heroGlowP.setShader(heroGradient(0, rc));
+                this.heroGlowP.setAlpha(stage >= 5 ? 150 : 125);
+                canvas.save();
+                canvas.translate(cx, mid);
+                canvas.scale(rr, rr);
+                canvas.rotate(this.time * 16.0f);
+                canvas.drawPath(this.heroRays, this.heroGlowP);
+                if (stage >= 5) {
+                    canvas.rotate(15.0f - (this.time * 40.0f));
+                    canvas.scale(0.72f, 0.72f);
+                    canvas.drawPath(this.heroRays, this.heroGlowP);
+                }
+                canvas.restore();
+            }
+            float ar = bh * ((0.05f * pulse) + 0.82f);
+            heroGlow(canvas, 0, rc, cx, mid, ar, ar, (int) ((40.0f * pulse) + 205.0f));
+        }
+        // 2. frenzy: fire glow + pixel flame wall + rising embers behind the hero
+        if (fr > 0.0f) {
+            heroGlow(canvas, 2, 0xFFFF6A1A, cx, this.groundY - (bh * 0.5f), bh * 1.05f, bh, (int) (190.0f * fr));
+            heroFlames(canvas, cx, this.groundY + (f * 0.5f), f, bh, fr);
+        }
+        // lean into the swing (and a permanent forward stoop while enraged)
+        float lean = (0.11f * lk) + (0.05f * fr);
+        canvas.save();
+        if (lean > 0.0f) {
+            canvas.translate(cx, this.groundY);
+            canvas.skew(-lean, 0.0f);
+            canvas.translate(-cx, -this.groundY);
+        }
+        // 3. outlines: flickering fire outline in frenzy, rim light from the staff orb always
+        if (fr > 0.0f) {
+            int oa = (int) (((((float) Math.sin(this.time * 15.0f)) * 70.0f) + 170.0f) * fr);
+            heroSilhouette(canvas, bitmap, cx - f, foot, f, sx, sy, 0, 0xFFFF7A1E, oa);
+            heroSilhouette(canvas, bitmap, cx + f, foot, f, sx, sy, 0, 0xFFFF7A1E, oa);
+            heroSilhouette(canvas, bitmap, cx, foot - f, f, sx, sy, 0, 0xFFFF7A1E, oa);
+        }
+        int rimA = (int) ((175.0f * cast) + 55.0f + (((float) Math.sin(this.time * 5.0f)) * 25.0f));
+        heroSilhouette(canvas, bitmap, cx + (0.75f * f), foot, f, sx, sy, 1, sc, rimA);
+        heroSilhouette(canvas, bitmap, cx + (0.4f * f), foot - (0.6f * f), f, sx, sy, 1, sc, rimA / 2);
+        // 4. the sprite itself
+        blit(canvas, bitmap, cx, foot, f, sx, sy, this.bp);
+        // face: periodic blink, angry brows while enraged (every hero_N.png has its eyes at pixels (6,9) and (11,9))
+        if (bitmap.getWidth() == 18 && bitmap.getHeight() == 22) {
+            float pw = f * sx;
+            float ph = f * sy;
+            float left = cx - (9.0f * pw);
+            float top = foot - (22.0f * ph);
+            Paint q = this.heroPixP;
+            if (this.time % 4.3f < 0.13f) {
+                q.setColor(0xFFF2D2B6);
+                canvas.drawRect(left + (6.0f * pw), top + (9.0f * ph), left + (7.0f * pw), top + (10.0f * ph), q);
+                canvas.drawRect(left + (11.0f * pw), top + (9.0f * ph), left + (12.0f * pw), top + (10.0f * ph), q);
+                q.setColor(0xFF1A1020);
+                canvas.drawRect(left + (5.8f * pw), top + (9.55f * ph), left + (7.2f * pw), top + (9.95f * ph), q);
+                canvas.drawRect(left + (10.8f * pw), top + (9.55f * ph), left + (12.2f * pw), top + (9.95f * ph), q);
+            }
+            if (fr > 0.0f) {
+                q.setColor(0xFF1A1020);
+                q.setAlpha((int) (255.0f * Math.min(1.0f, fr * 2.0f)));
+                canvas.drawRect(left + (7.0f * pw), top + (8.0f * ph), left + (8.0f * pw), top + (9.0f * ph), q);
+                canvas.drawRect(left + (10.0f * pw), top + (8.0f * ph), left + (11.0f * pw), top + (9.0f * ph), q);
+                canvas.drawRect(left + (6.0f * pw), top + (8.0f * ph), left + (7.0f * pw), top + (8.45f * ph), q);
+                canvas.drawRect(left + (11.0f * pw), top + (8.0f * ph), left + (12.0f * pw), top + (8.45f * ph), q);
+            }
+        }
+        if (fr > 0.0f) {
+            heroSilhouette(canvas, bitmap, cx, foot, f, sx, sy, 0, 0xFFFF7A1E, (int) (((((float) Math.sin(this.time * 9.0f)) * 22.0f) + 34.0f) * fr));
+        }
+        if (this.overlay == 6 && !this.deathCrash && this.deathT > 0.4f && (((int) (this.time * 12.0f)) & 1) == 0) {
+            heroSilhouette(canvas, bitmap, cx, foot, f, sx, sy, 4, 0xFFFF3B3B, 120);
+        }
+        // 5. headphones (rhythm mode); cups flash on the beat
         if (rhythmOn()) {
-            float f12 = this.heroX + f10;
-            float height = ((this.groundY + f) + round) - ((bitmap.getHeight() * f) * f11);
-            this.p.setColor(-3921286);
+            float height = foot - (bh * sy);
+            Paint q = this.heroPixP;
+            q.setColor(-3921286);
             float f13 = f * 8.0f;
             float f14 = f * 6.0f;
             float f15 = height + f14;
             float f16 = height + (11.0f * f);
-            canvas.drawRect(f12 - f13, f15, f12 - f14, f16, this.p);
-            canvas.drawRect(f12 + f14, f15, f12 + f13, f16, this.p);
-            this.p.setColor(-45149);
+            canvas.drawRect(cx - f13, f15, cx - f14, f16, q);
+            canvas.drawRect(cx + f14, f15, cx + f13, f16, q);
+            q.setColor(heroMix(-45149, -1, this.beatPulse * 0.6f));
             float f17 = f * 7.5f;
-            float f18 = height + f3;
+            float f18 = height + (f * 7.0f);
             float f19 = f * 6.5f;
             float f20 = height + (f * 10.0f);
-            canvas.drawRect(f12 - f17, f18, f12 - f19, f20, this.p);
-            canvas.drawRect(f12 + f19, f18, f12 + f17, f20, this.p);
+            canvas.drawRect(cx - f17, f18, cx - f19, f20, q);
+            canvas.drawRect(cx + f19, f18, cx + f17, f20, q);
+            if (this.beatPulse > 0.05f) {
+                q.setColor(-1);
+                q.setAlpha((int) (this.beatPulse * 220.0f));
+                canvas.drawRect(cx - f13, f15, cx - f17, f15 + f, q);
+                canvas.drawRect(cx + f17, f15, cx + f13, f15 + f, q);
+            }
         }
-        float f21 = this.heroX + (10.0f * f) + (f10 * 1.3f);
-        float f22 = (this.groundY - (24.0f * f)) - ((this.heroCast * f) * 2.0f);
-        this.p.setColor(-15331286);
-        float f23 = f * 1.5f;
-        float f24 = f21 - f23;
-        float f25 = f21 + f23;
-        canvas.drawRect(f24, f22, f25, this.groundY + f, this.p);
-        this.p.setColor(-7644629);
-        float f26 = f * 0.5f;
-        float f27 = f21 - f26;
-        canvas.drawRect(f27, f22, f21 + f26, this.groundY, this.p);
-        int i3 = this.lifeStageIdx;
-        int i4 = i3 == 0 ? -5720 : i3 >= 4 ? -5213953 : -19906;
-        this.p.setColor(i4);
-        this.p.setAlpha((int) ((this.heroCast * 120.0f) + 70.0f + (Math.sin(this.time * 5.0f) * 30.0d)));
-        canvas.drawCircle(f21, f22, ((this.heroCast * 3.0f) + 4.0f) * f, this.p);
-        this.p.setAlpha(255);
-        this.p.setColor(-15331286);
-        float f28 = 2.5f * f;
-        canvas.drawRect(f21 - f28, f22 - f28, f21 + f28, f22 + f28, this.p);
-        this.p.setColor(i4);
-        float f29 = f22 - f23;
-        canvas.drawRect(f24, f29, f25, f22 + f23, this.p);
-        this.p.setColor(-1);
-        canvas.drawRect(f24, f29, f27, f22 - f26, this.p);
-        float f30 = this.heroCast;
-        if (f30 > 0.35f) {
-            float f31 = f * ((f30 * 9.0f) + 3.0f);
-            float f32 = f * 0.7f;
-            this.p.setColor(-1);
-            this.p.setAlpha((int) (Math.min(1.0f, (this.heroCast - 0.35f) * 2.2f) * 255.0f));
-            canvas.drawRect(f21 - f31, f22 - f32, f21 + f31, f22 + f32, this.p);
-            canvas.drawRect(f21 - f32, f22 - f31, f21 + f32, f22 + f31, this.p);
-            this.p.setColor(i4);
-            this.p.setAlpha((int) (this.heroCast * 200.0f));
-            float f33 = f31 * 0.5f;
-            float f34 = f21 - f33;
-            float f35 = f22 - f33;
-            float f36 = f32 * 2.0f;
-            canvas.drawRect(f34, f35, f34 + f36, f35 + f36, this.p);
-            float f37 = f21 + f33;
-            float f38 = f22 + f33;
-            canvas.drawRect(f37 - f36, f38 - f36, f37, f38, this.p);
-            this.p.setAlpha(255);
-        }
+        // 6. staff: wood grain, grip wrap, gold collar, glowing orb with orbiting motes, cast shockwave
+        heroStaff(canvas, f, f10, cast, sc, fr);
+        canvas.restore();
     }
 
     void drawIsekai(Canvas var1) {
@@ -5946,15 +6530,58 @@ public class GameView extends View implements Runnable {
     }
 
     void drawPrincess(Canvas canvas) {
+        int sel = this.compSel;
+        if (this.bmComp == null || sel < 0 || sel >= this.bmComp.length || this.bmComp[sel] == null) {
+            return;
+        }
+        Bitmap bmp = this.bmComp[sel];
         float f = this.hu * 0.6f;
         float princessX = princessX();
-        float abs = ((float) Math.abs(Math.sin(this.time * 2.0f))) * f * 0.6f;
-        this.p.setColor(1426063360);
-        float f2 = 6.0f * f;
-        float f3 = this.groundY;
-        this.r.set(princessX - f2, f3 - f, f2 + princessX, f3 + f);
-        canvas.drawOval(this.r, this.p);
-        blit(canvas, this.bmComp[this.compSel], princessX, (this.groundY + f) - abs, f, 1.0f, 1.0f, this.bp);
+        float t = this.time;
+        float fr = heroFrenzyK();
+        // little idle hop (bouncier while the hero is enraged), squash on landing, breathing, gentle sway
+        float hop = Math.abs((float) Math.sin(t * (fr > 0.0f ? 3.4f : 2.0f)));
+        float abs = hop * f * 0.6f;
+        float bh = bmp.getHeight() * f;
+        float bw = bmp.getWidth() * f;
+        int gc = heroCompGlow[sel % heroCompGlow.length];
+        float land = 1.0f - hop;
+        float land4 = land * land * land * land;
+        float sx = (0.045f * land4) + 1.0f;
+        float sy = (1.0f - (0.04f * land4)) + (((float) Math.sin(t * 2.3f)) * 0.012f);
+        heroShadow(canvas, princessX, this.groundY + (f * 0.2f), 10.0f * f * (1.0f - (0.12f * hop)), 2.3f * f * (1.0f - (0.12f * hop)), (int) ((1.0f - (0.2f * hop)) * 235.0f));
+        float pulse = (float) Math.sin(t * 1.7f);
+        float ar = bh * ((0.03f * pulse) + 0.62f);
+        heroGlow(canvas, 4, gc, princessX, (this.groundY - (bh * 0.5f)) - abs, ar, ar, (int) ((30.0f * pulse) + 95.0f + (60.0f * fr)));
+        float foot = (this.groundY + f) - abs;
+        canvas.save();
+        canvas.translate(princessX, this.groundY);
+        canvas.skew(((float) Math.sin(t * 1.25f)) * 0.035f, 0.0f);
+        canvas.translate(-princessX, -this.groundY);
+        int ra = (int) ((20.0f * pulse) + 62.0f);
+        heroSilhouette(canvas, bmp, princessX - f, foot, f, sx, sy, 3, gc, ra);
+        heroSilhouette(canvas, bmp, princessX + f, foot, f, sx, sy, 3, gc, ra);
+        heroSilhouette(canvas, bmp, princessX, foot - f, f, sx, sy, 3, gc, ra);
+        blit(canvas, bmp, princessX, foot, f, sx, sy, this.bp);
+        canvas.restore();
+        // twinkles popping around her
+        for (int k = 0; k < 3; k++) {
+            float tt = (t + (k * 0.63f)) / 1.9f;
+            int cyc = (int) Math.floor(tt);
+            float ph = tt - cyc;
+            if (ph < 0.6f) {
+                float e = (float) Math.sin((ph / 0.6f) * 3.141592653589793d);
+                float px = princessX + ((heroHash((cyc * 3) + (k * 101)) - 0.5f) * bw * 1.5f);
+                float py = ((this.groundY - (bh * ((heroHash(((cyc * 7) + (k * 53)) + 11) * 0.85f) + 0.2f))) - abs);
+                heroSpark(canvas, px, py, f * 1.5f * e, heroMix(gc, -1, 0.5f), (int) (230.0f * e));
+            }
+        }
+        // a heart floats up every few seconds
+        float hp = (t % 5.0f) / 1.6f;
+        if (hp < 1.0f) {
+            float ha = hp < 0.15f ? hp / 0.15f : 1.0f - ((hp - 0.15f) / 0.85f);
+            heroHeart(canvas, princessX + (bw * 0.25f) + (((float) Math.sin(hp * 9.0f)) * f * 1.2f), (((this.groundY - bh) - (f * 2.0f)) - ((hp * f) * 12.0f)) - abs, f * 0.75f, gc, (int) (235.0f * ha));
+        }
     }
 
     void drawPrincessBubble(Canvas canvas) {
@@ -5962,13 +6589,23 @@ public class GameView extends View implements Runnable {
         if (i < 0 || !compUnlocked(i)) {
             return;
         }
+        float f2 = this.princessSayT;
+        // remember when a new line started, for the pop-in (pure draw-side bookkeeping)
+        if (f2 > this.heroBubbleLast + 0.001f) {
+            this.heroBubbleBorn = this.time;
+        }
+        this.heroBubbleLast = f2;
         float f = this.hu * 0.6f;
         float princessX = princessX();
-        float f2 = this.princessSayT;
-        if (f2 <= 0.0f || this.overlay != 0) {
+        if (f2 <= 0.0f || this.overlay != 0 || this.bmPrincess == null || this.princessLine == null) {
             return;
         }
         float min = Math.min(1.0f, f2 * 3.0f);
+        float age = this.time - this.heroBubbleBorn;
+        if (age < 0.0f) {
+            age = 1.0f;
+        }
+        float sc = Math.max(0.05f, heroBackOut(Math.min(1.0f, age / 0.3f))) * ((0.12f * min) + 0.88f);
         this.tp.setTextSize(this.pad * 1.5f);
         this.tp.setFakeBoldText(true);
         float measureText = this.tp.measureText(this.princessLine);
@@ -5978,25 +6615,63 @@ public class GameView extends View implements Runnable {
         float height = this.groundY - (this.bmPrincess.getHeight() * f);
         float f5 = this.pad;
         float f6 = height - (4.2f * f5);
-        this.r.set(max, f6, f4 + max, (f5 * 2.8f) + f6);
-        this.p.setColor(-1);
-        this.p.setAlpha((int) (235.0f * min));
-        RectF rectF = this.r;
-        float f7 = this.pad;
-        canvas.drawRoundRect(rectF, f7 * IMPACT, f7 * IMPACT, this.p);
-        Path path = new Path();
-        path.moveTo(princessX - (this.pad * 0.5f), this.r.bottom);
-        path.lineTo((this.pad * 0.8f) + princessX, this.r.bottom);
-        path.lineTo(princessX, this.r.bottom + (this.pad * IMPACT));
-        path.close();
-        canvas.drawPath(path, this.p);
-        this.p.setAlpha(255);
+        RectF rectF = this.heroR;
+        rectF.set(max, f6, f4 + max, (f5 * 2.8f) + f6);
+        float rad = this.pad * IMPACT;
+        float tipY = rectF.bottom + (this.pad * IMPACT);
+        float tl = princessX - (this.pad * 0.5f);
+        float trr = princessX + (this.pad * 0.8f);
+        float lw = this.pad * 0.22f;
+        canvas.save();
+        canvas.translate(0.0f, ((float) Math.sin(this.time * 2.4f)) * this.pad * 0.18f);
+        canvas.scale(sc, sc, princessX, tipY);
+        // drop shadow (body + tail)
+        float so = this.pad * 0.3f;
+        this.heroFxP.setColor(-16777216);
+        this.heroFxP.setAlpha((int) (70.0f * min));
+        rectF.offset(so, so);
+        canvas.drawRoundRect(rectF, rad, rad, this.heroFxP);
+        rectF.offset(-so, -so);
+        this.heroPath.reset();
+        this.heroPath.moveTo(tl + so, rectF.bottom + so);
+        this.heroPath.lineTo(trr + so, rectF.bottom + so);
+        this.heroPath.lineTo(princessX + so, tipY + so);
+        this.heroPath.close();
+        canvas.drawPath(this.heroPath, this.heroFxP);
+        // body + soft lower shade + outline
+        this.heroFxP.setColor(-1);
+        this.heroFxP.setAlpha((int) (240.0f * min));
+        canvas.drawRoundRect(rectF, rad, rad, this.heroFxP);
+        this.heroFxP.setColor(heroCompGlow[i % heroCompGlow.length]);
+        this.heroFxP.setAlpha((int) (34.0f * min));
+        canvas.drawRect(rectF.left + rad, rectF.bottom - (this.pad * 0.7f), rectF.right - rad, rectF.bottom - lw, this.heroFxP);
+        this.heroLineP.setStrokeWidth(lw);
+        this.heroLineP.setColor(-14017990);
+        this.heroLineP.setAlpha((int) (230.0f * min));
+        canvas.drawRoundRect(rectF, rad, rad, this.heroLineP);
+        // tail: the fill hides the outline where it joins, then its two sides get outlined
+        this.heroPath.reset();
+        this.heroPath.moveTo(tl, rectF.bottom - lw);
+        this.heroPath.lineTo(trr, rectF.bottom - lw);
+        this.heroPath.lineTo(princessX, tipY);
+        this.heroPath.close();
+        this.heroFxP.setColor(-1);
+        this.heroFxP.setAlpha((int) (240.0f * min));
+        canvas.drawPath(this.heroPath, this.heroFxP);
+        this.heroPath.reset();
+        this.heroPath.moveTo(tl, rectF.bottom);
+        this.heroPath.lineTo(princessX, tipY);
+        this.heroPath.lineTo(trr, rectF.bottom);
+        canvas.drawPath(this.heroPath, this.heroLineP);
+        // heart badge on the corner
+        heroHeart(canvas, rectF.right - (this.pad * 0.2f), rectF.top + (this.pad * 0.15f), this.pad * 0.2f * ((((float) Math.sin(this.time * 6.0f)) * 0.12f) + 1.0f), heroCompGlow[i % heroCompGlow.length], (int) (255.0f * min));
         this.tp.setTextAlign(Paint.Align.LEFT);
         this.tp.setColor(-14017990);
         this.tp.setAlpha((int) (min * 255.0f));
         String str = this.princessLine;
         float f8 = this.pad;
         canvas.drawText(str, max + f8, f6 + (f8 * 1.95f), this.tp);
+        canvas.restore();
         this.tp.setAlpha(255);
         this.tp.setFakeBoldText(false);
         this.tp.setTextAlign(Paint.Align.CENTER);
