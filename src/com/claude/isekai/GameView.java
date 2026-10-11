@@ -308,6 +308,7 @@ public class GameView extends View implements Runnable {
     float scrollT;
     int seenOverlay;
     int setAsk;
+    long setAskAt;
     String setMsg;
     float setMsgT;
     final RectF[] setRows;
@@ -1276,7 +1277,7 @@ public class GameView extends View implements Runnable {
             this.mana += manaSec;
             showBanner("✨ Фея дарит " + fmt(manaSec) + " маны!", -4609793);
         } else {
-            this.frenzyUntil = SystemClock.uptimeMillis() + 30000;
+            this.frenzyUntil = Math.max(this.frenzyUntil, SystemClock.uptimeMillis()) + 30000;
             showBanner("✨ Ярость феи: урон ×3 на 30 секунд!", -25990);
         }
         for (int i = OV_NONE; i < 25; i++) {
@@ -1413,7 +1414,7 @@ public class GameView extends View implements Runnable {
                 this.mana += (manaTap() * 150.0d) + (manaSec() * 90.0d);
                 break;
             case 4:
-                this.frenzyUntil = SystemClock.uptimeMillis() + 60000;
+                this.frenzyUntil = Math.max(this.frenzyUntil, SystemClock.uptimeMillis()) + 60000;
                 break;
             case 5:
                 this.mana += ((manaTap() * 150.0d) + (manaSec() * 90.0d)) * 3.0d;
@@ -6864,6 +6865,20 @@ public class GameView extends View implements Runnable {
         save();
     }
 
+    public boolean onBack() {
+        int i = this.overlay;
+        if (i == OV_SETTINGS && this.setAsk > 0) {
+            this.setAsk = OV_NONE;
+            this.pendingImport = null;
+            return true;
+        }
+        if (i == OV_CONFIRM || i == OV_PARTY || i == OV_SETTINGS || i == OV_PORTRAIT) {
+            this.overlay = OV_NONE;
+            return true;
+        }
+        return false;
+    }
+
     public void releaseAudio() {
         pauseGame();
         this.sfx.release();
@@ -7314,9 +7329,10 @@ public class GameView extends View implements Runnable {
                 }
                 if (i == 2) {
                     this.setAsk = 3;
+                    this.setAskAt = SystemClock.uptimeMillis();
                     return;
                 } else {
-                    if (i == 3) {
+                    if (i == 3 && SystemClock.uptimeMillis() - this.setAskAt > 600) {
                         this.prefs.edit().clear().commit();
                         restartGame();
                         return;

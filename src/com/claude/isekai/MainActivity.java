@@ -29,6 +29,13 @@ public class MainActivity extends Activity {
     }
 
     @Override // android.app.Activity
+    public void onBackPressed() {
+        if (!this.game.onBack()) {
+            super.onBackPressed();
+        }
+    }
+
+    @Override // android.app.Activity
     protected void onDestroy() {
         super.onDestroy();
         this.game.releaseAudio();
