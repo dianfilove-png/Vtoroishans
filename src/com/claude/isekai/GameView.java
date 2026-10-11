@@ -346,6 +346,13 @@ public class GameView extends View implements Runnable {
     final RectF towerBtn;
     final RectF towerClose;
     boolean towerFight;
+    float wsX;
+    float wsY;
+    long wsUntil;
+    long wsNext;
+    long wsLife;
+    int wsStreak;
+    int wsBest;
     int towerFloor;
     final RectF towerGo;
     final Paint tp;
@@ -1901,6 +1908,7 @@ public class GameView extends View implements Runnable {
         drawHero(canvas);
         drawFamiliar(canvas);
         drawMonster(canvas);
+        drawWeakSpot(canvas);
         if (this.overlay == 6) {
             drawDeath(canvas);
         }
@@ -5918,6 +5926,7 @@ public class GameView extends View implements Runnable {
        this.bestStage = this.prefs.getInt("best", 1);
        SharedPreferences var12 = this.prefs;
        this.taps = var12.getLong("taps2", (long)var12.getInt("taps", 0));
+       this.wsBest = var12.getInt("wsBest", 0);
        this.kills = this.prefs.getLong("kills", 0L);
        this.bossKills = this.prefs.getLong("bkills", 0L);
        this.fairies = this.prefs.getLong("fairies", 0L);
@@ -6708,6 +6717,9 @@ public class GameView extends View implements Runnable {
                     }
                 }
             }
+            if (z && weakTap(x, y)) {
+                return true;
+            }
             if (!this.farming || !this.bossBtn.contains(x, y)) {
                 tapAttack();
                 return true;
@@ -7262,6 +7274,7 @@ public class GameView extends View implements Runnable {
         edit.putInt("life", this.lifeNo);
         edit.putInt("best", this.bestStage);
         edit.putLong("taps2", this.taps);
+        edit.putInt("wsBest", this.wsBest);
         edit.putLong("kills", this.kills);
         edit.putLong("bkills", this.bossKills);
         edit.putLong("fairies", this.fairies);
@@ -7685,6 +7698,97 @@ public class GameView extends View implements Runnable {
             j2 = 650;
         }
         return j - this.storyPageAt > j2;
+    }
+
+    void drawWeakSpot(Canvas canvas) {
+        long now = SystemClock.uptimeMillis();
+        if (this.overlay != 0 || this.towerFight || this.mobR <= 0.0f) {
+            this.wsUntil = 0L;
+            this.wsNext = Math.max(this.wsNext, now + 3000);
+            return;
+        }
+        if (this.wsUntil == 0L) {
+            if (this.wsNext == 0L) {
+                this.wsNext = now + 6000;
+            }
+            if (now < this.wsNext) {
+                return;
+            }
+            double a = this.rnd.nextDouble() * Math.PI * 2.0d;
+            float r = this.mobR * (0.15f + (this.rnd.nextFloat() * 0.4f));
+            this.wsX = (float) Math.cos(a) * r;
+            this.wsY = (float) Math.sin(a) * r;
+            this.wsLife = Math.max(900L, 1800L - (this.wsStreak * 90L));
+            this.wsUntil = now + this.wsLife;
+            if (this.wsBest == 0 && this.wsStreak == 0) {
+                showBanner("🎯 Слабое место! Успей тапнуть по мишени", -10496);
+            }
+            return;
+        }
+        if (now > this.wsUntil) {
+            if (this.wsStreak >= 3) {
+                showBanner("Серия слабых мест прервана: " + this.wsStreak, -30070);
+            }
+            this.wsStreak = 0;
+            this.wsUntil = 0L;
+            this.wsNext = now + 4000 + this.rnd.nextInt(4000);
+            return;
+        }
+        float k = (this.wsUntil - now) / (float) this.wsLife;
+        float cx = this.mobX + this.wsX;
+        float cy = this.mobY + this.wsY;
+        float base = this.pad * 2.2f;
+        float pulse = (float) Math.sin(this.time * 14.0f) * 0.15f + 1.0f;
+        this.p.setStyle(Style.STROKE);
+        this.p.setStrokeWidth(this.pad * 0.45f);
+        this.p.setColor(-10496);
+        canvas.drawCircle(cx, cy, base * pulse, this.p);
+        this.p.setColor(-42406);
+        canvas.drawCircle(cx, cy, base * (1.0f + (2.2f * k)), this.p);
+        this.p.setStyle(Style.FILL);
+        this.p.setColor(-1);
+        canvas.drawCircle(cx, cy, base * 0.3f, this.p);
+        if (this.wsStreak > 1) {
+            this.tp.setTextAlign(Paint.Align.CENTER);
+            this.tp.setTextSize(this.pad * 2.0f);
+            this.tp.setColor(-10496);
+            canvas.drawText("x" + this.wsStreak, cx, cy - (base * 1.8f), this.tp);
+        }
+    }
+
+    boolean weakTap(float f, float f2) {
+        if (this.wsUntil == 0L || this.overlay != 0) {
+            return false;
+        }
+        float cx = this.mobX + this.wsX;
+        float cy = this.mobY + this.wsY;
+        if (Math.hypot(f - cx, f2 - cy) > this.pad * 5.0f) {
+            return false;
+        }
+        long now = SystemClock.uptimeMillis();
+        this.wsStreak++;
+        this.taps++;
+        double d = tapDmg() * comboMult() * 10.0d * ((Math.min(this.wsStreak - 1, 8) * 0.25d) + 1.0d);
+        this.mana += manaTap() * 5.0d;
+        addFloat(cx, cy - this.pad * 2.0f, "СЛАБОЕ МЕСТО! " + fmt(d), -10496, this.pad * 2.8f);
+        burstAt(cx, cy, 14, -10496);
+        this.heroCast = 1.0f;
+        this.sfx.play(1, 0.8f);
+        this.sfx.buzz(40L);
+        if (this.wsStreak % 5 == 0) {
+            this.frenzyUntil = Math.max(this.frenzyUntil, now) + 5000;
+            showBanner("🎯 Серия " + this.wsStreak + "! Ярость +5с", -10496);
+        }
+        if (this.wsStreak > this.wsBest) {
+            this.wsBest = this.wsStreak;
+            if (this.wsBest >= 5) {
+                showBanner("🎯 Рекорд серии слабых мест: " + this.wsBest, -10496);
+            }
+        }
+        this.wsUntil = 0L;
+        this.wsNext = now + 1500 + this.rnd.nextInt(2500);
+        damage(d, true);
+        return true;
     }
 
     void tapAttack() {
