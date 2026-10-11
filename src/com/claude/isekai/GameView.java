@@ -217,6 +217,7 @@ public class GameView extends View implements Runnable {
     long lastHoldBuy;
     double lastJudgeAt;
     long lastSave;
+    long pausedAt;
     int lifeNo;
     int lifeStageIdx;
     double lifetimeGold;
@@ -1335,12 +1336,12 @@ public class GameView extends View implements Runnable {
     void checkDay() {
         long j = today();
         long j2 = this.lastDay;
-        if (j != j2) {
+        if (j > j2) {
             this.streak = j2 == j - 1 ? this.streak + 1 : 1;
             this.lastDay = j;
             this.dailyPending = true;
         }
-        if (this.questDay != j) {
+        if (this.questDay < j) {
             newQuests(j);
         }
     }
@@ -6862,7 +6863,23 @@ public class GameView extends View implements Runnable {
         this.handler.removeCallbacks(this);
         this.sfx.musicPause();
         this.anchorPos = -1.0d;
+        this.pausedAt = System.currentTimeMillis();
         save();
+    }
+
+    void grantOffline(long j) {
+        double d = Math.min((System.currentTimeMillis() - j) / 1000.0d, 28800.0d);
+        if (d <= 60.0d) {
+            return;
+        }
+        double autoDps = autoDps() * d / hpFor(this.stage) * goldFor(this.stage) * offlineRate();
+        double manaSec = manaSec() * d * offlineRate();
+        if (autoDps + manaSec > 0.0d) {
+            this.gold += autoDps;
+            this.mana += manaSec;
+            this.lifetimeGold += autoDps;
+            showBanner("Пока тебя не было: +" + fmt(autoDps) + " \ud83e\ude99  +" + fmt(manaSec) + " \ud83d\udca7", -5720);
+        }
     }
 
     public boolean onBack() {
@@ -7068,6 +7085,12 @@ public class GameView extends View implements Runnable {
         this.handler.removeCallbacks(this);
         this.handler.post(this);
         this.sfx.musicResume();
+        long j = this.pausedAt;
+        this.pausedAt = 0L;
+        if (j > 0) {
+            grantOffline(j);
+            checkDay();
+        }
     }
 
     boolean rhythmOn() {
@@ -7804,7 +7827,7 @@ public class GameView extends View implements Runnable {
     }
 
     double towerHp(int i) {
-        return hpFor((i * 5) + 5) * 8.0d * 1.5d;
+        return Math.pow(1.15d, (i * 5) + 4) * 26.0d * 8.0d * 1.5d;
     }
 
     void towerLose() {
