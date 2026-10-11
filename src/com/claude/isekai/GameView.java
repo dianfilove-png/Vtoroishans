@@ -1754,123 +1754,911 @@ public class GameView extends View implements Runnable {
        var1.drawText("Потраченные души больше не усиливают урон — выбирай с умом", (float)this.W / 2.0F, (float)this.H * 0.992F, this.tp);
     }
 
-    void drawAmbient(Canvas var1) {
-       int var17 = this.biome();
-       float var9 = this.groundY - this.battleT;
-       int var14;
-       if (var17 == 2) {
-          var14 = -20320;
-       } else if (var17 == 1) {
-          var14 = -2035457;
-       } else {
-          var14 = -3622657;
-       }
+    // ===== gfx/bg: world & atmosphere (sky light, weather, grass, vignette) =====
+    static final int[] bgStarCol = {0xFFFFF6E0, 0xFFC8B8FF, 0xFF9CECFF, 0xFFCFA9FF, 0xFFFFD6CC, 0xFFFFE6A0};
+    static final int[] bgHazeCol = {0xFFC27AA8, 0xFF3E8099, 0xFFFF5A3A};
+    static final int[] bgMistCol = {0xFFC8B8FF, 0xFF9CECFF, 0xFFFF8A70};
+    static final int[] bgEdgeCol = {0xFF12062A, 0xFF030C16, 0xFF1C0004};
+    static final int[] bgLightCol = {0xFFFFF0C8, 0xFF9CECFF, 0xFFFF5A48};
+    static final int[] bgMoteCol = {0xFF5AE0FF, 0xFF5AFFB0, 0xFFB070FF, 0xFF9CECFF};
+    static final int[] bgEmberCol = {0xFFFFD35A, 0xFFFF6A3A, 0xFFFF3A2A};
+    static final int[] bgLeafCol = {0xFFC0803A, 0xFF5BBE4A, 0xFFAC6383};
+    static final int[] bgFlowerCol = {0xFFFF8AC0, 0xFFFFD35A, 0xFFE8E0FF};
+    // per-biome cloud palette: body, moon-lit top, underside
+    static final int[] bgCloudCol = {
+        0xFF6A4E96, 0xFFC8B4E8, 0xFF46306E,
+        0xFF9CECFF, 0xFFC8F4FF, 0xFF5AA0C0,
+        0xFF3A1020, 0xFFD04A40, 0xFF1A0A14};
+    // per-biome grass palette: base, stem, upper, tip, foreground silhouette
+    static final int[] bgGrassCol = {
+        0xFF1F4A22, 0xFF2E6A2A, 0xFF5BBE4A, 0xFFA8E88A, 0xFF0B1A10,
+        0xFF41587A, 0xFF8AB0D0, 0xFFC8E4F8, 0xFFFFFFFF, 0xFF121A2A,
+        0xFF3A1414, 0xFF6A2A20, 0xFFB8503A, 0xFFFF9A5A, 0xFF16070A};
+    // pixel cloud rows (x0,x1 in cloud pixels, top row first), two puffy shapes of 8 rows
+    static final byte[] bgCloudRows = {
+        8, 13, 5, 16, 4, 18, 2, 21, 1, 23, 0, 24, 1, 23, 3, 20,
+        4, 9, 2, 12, 1, 17, 0, 22, 0, 28, 2, 30, 3, 29, 6, 25};
+    // foreground decoration spots (fractions of W), kept clear of hero and monster
+    static final float[] bgDecoX = {0.045f, 0.385f, 0.47f, 0.865f, 0.955f};
+    final Paint bgP = new Paint();
+    final Paint bgGlowP = new Paint(1);
+    final Paint bgLineP = new Paint(1);
+    final Paint bgBmpP = new Paint();
+    final Paint bgSkyP = new Paint();
+    final Paint bgFloorP = new Paint();
+    final Paint bgHaloP = new Paint(1);
+    final Paint bgRayP = new Paint(1);
+    final Paint bgShaftP = new Paint(1);
+    final Paint bgHazeP = new Paint();
+    final Paint bgGroundP = new Paint();
+    final Paint bgRimP = new Paint();
+    final Paint bgTintP = new Paint();
+    final Paint bgVigP = new Paint();
+    final Paint bgTopP = new Paint();
+    final Paint bgBotP = new Paint();
+    final Paint bgFzP = new Paint();
+    final Paint bgBossP = new Paint();
+    final RectF bgR = new RectF();
+    final Rect bgSrc = new Rect();
+    final Path bgRayPath = new Path();
+    final Path[] bgShaft = {new Path(), new Path(), new Path()};
+    final float[] bgShaftO = new float[6];
+    final LightingColorFilter[] bgBossCF = bgMakeCF(0xC4949C, 0x2A0008, 10);
+    final LightingColorFilter[] bgFzCF = bgMakeCF(0xFFEAD0, 0x120400, 8);
+    // what bgScan() learned from each biome's background art
+    final Bitmap[] bgScanBmp = new Bitmap[3];
+    int[] bgPix;
+    final int[] bgCells = new int[2048];
+    final int[] bgBw = {128, 128, 128};
+    final int[] bgBh = {112, 112, 112};
+    final int[] bgSkyC = {0xFF1E1440, 0xFF2E2A40, 0xFF12060E};
+    final int[] bgFloorC = {0xFF2A1E16, 0xFF221E30, 0xFF2A2230};
+    final float[] bgMoonU = new float[3];
+    final float[] bgMoonV = new float[3];
+    final float[] bgMoonR = new float[3];
+    final int[] bgStarN = new int[3];
+    final float[] bgStarU = new float[66];
+    final float[] bgStarV = new float[66];
+    final int[] bgGlintN = new int[3];
+    final float[] bgGlintU = new float[60];
+    final float[] bgGlintV = new float[60];
+    final int[] bgSpotN = new int[3];
+    final float[] bgSpotU = new float[72];
+    final float[] bgSpotV = new float[72];
+    final int[] bgSpotC = new int[72];
+    // shader cache keys and per-frame visual state
+    int bgKeyBi = -1;
+    float bgKeyW = -1f, bgKeyT, bgKeyB, bgKeyG;
+    int bgVKeyBi = -1;
+    float bgVKeyW = -1f, bgVKeyT, bgVKeyB;
+    float bgTop, bgBx = 1f, bgMX, bgMY, bgMR, bgHaloR, bgHazeT, bgHazeB;
+    float bgFz, bgBossA, bgBeat, bgLastT;
+    long bgFzOn;
 
-       for (int var15 = 0; var15 < 4; var15++) {
-          float var10 = this.bgS;
-          int var16 = var15 % 2;
-          float var8 = ((float)var16 * 0.5F + 1.2F) * var10;
-          float var12 = 26.0F * var8;
-          double var2 = (double)var15;
-          int var18 = this.W;
-          float var11 = (float)((0.37 * var2 * (double)var18 + (double)this.time * (var2 * 2.2 + 3.0) * (double)var10) % (double)((float)var18 + 2.0F * var12))
-             - var12;
-          var10 = this.battleT + ((float)var15 * 0.09F + 0.07F) * var9;
-          this.p.setColor(var14);
-          Paint var19 = this.p;
-          byte var55;
-          if (var16 == 0) {
-             var55 = 55;
-          } else {
-             var55 = 38;
-          }
+    static LightingColorFilter[] bgMakeCF(int mul, int add, int n) {
+        LightingColorFilter[] a = new LightingColorFilter[n];
+        for (int i = 0; i < n; i++) {
+            float f = (i + 1f) / n;
+            int m = 0;
+            int d = 0;
+            for (int sh = 0; sh <= 16; sh += 8) {
+                int mc = (mul >> sh) & 255;
+                int ac = (add >> sh) & 255;
+                m |= Math.round(255f + (mc - 255f) * f) << sh;
+                d |= Math.round(ac * f) << sh;
+            }
+            a[i] = new LightingColorFilter(m, d);
+        }
+        return a;
+    }
 
-          var19.setAlpha(var55);
-          float var13 = 4.0F * var8;
-          var1.drawRect(var11, var10, var11 + var12, var10 + var13, this.p);
-          var12 = var10 - 3.0F * var8;
-          var1.drawRect(var11 + var13, var12, var11 + 15.0F * var8, var10, this.p);
-          var13 = var11 + 12.0F * var8;
-          var1.drawRect(var13, var10 - 5.0F * var8, var11 + 20.0F * var8, var12, this.p);
-          var1.drawRect(var13, var12, var11 + var8 * 22.0F, var10, this.p);
-       }
+    static int bgA(int c, int a) {
+        return (c & 0xFFFFFF) | ((a < 0 ? 0 : a > 255 ? 255 : a) << 24);
+    }
 
-       this.p.setAlpha(255);
-       if (var17 == 0) {
-          for (int var49 = 0; var49 < 12; var49++) {
-             double var20 = (double)var49;
-             float var32 = (float)((0.13 * var20 + 0.04) * (double)this.W + Math.sin((double)this.time * 0.6 + 1.7 * var20) * (double)this.W * 0.05);
-             float var25 = this.battleT
-                + ((float)(var49 * 37 % 100) * 0.5F / 100.0F + 0.35F) * var9
-                + (float)Math.sin((double)this.time * 0.9 + var20) * var9 * 0.05F;
-             float var37 = (float)(Math.sin((double)this.time * 2.2 + var20 * 2.1) * 0.5 + 0.5);
-             this.p.setColor(-2556048);
-             this.p.setAlpha((int)(60.0F * var37));
-             var1.drawCircle(var32, var25, this.bgS * 4.0F, this.p);
-             this.p.setAlpha((int)(var37 * 255.0F));
-             var37 = this.bgS;
-             var1.drawRect(var32 - var37 * 0.6F, var25 - var37 * 0.6F, var32 + var37 * 0.6F, var25 + var37 * 0.6F, this.p);
-          }
-       } else if (var17 == 1) {
-          for (int var50 = 0; var50 < 34; var50++) {
-             float var39 = (float)(var50 % 5 * 7 + 14);
-             float var45 = this.bgS;
-             float var33 = this.battleT;
-             double var21 = (double)var50;
-             double var4 = (double)var9;
-             float var26 = this.time;
-             var33 += (float)((0.071 * var21 * var4 + (double)(var39 * var45 * var26)) % var4);
-             var4 = (double)this.W;
-             double var6 = Math.sin((double)var26 * 0.8 + var21);
-             var45 = this.bgS;
-             var39 = (float)((0.097 * var21 * var4 + var6 * (double)var45 * 6.0) % (double)this.W);
-             int var52 = var50 % 3;
-             if (var52 == 0) {
-                var26 = 1.0F;
-             } else {
-                var26 = 0.6F;
-             }
+    static int bgShade(int c, float f) {
+        int r = Math.min(255, (int) (((c >> 16) & 255) * f));
+        int g = Math.min(255, (int) (((c >> 8) & 255) * f));
+        int b = Math.min(255, (int) ((c & 255) * f));
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
+    }
 
-             var26 = var45 * var26;
-             this.p.setColor(-1);
-             Paint var56 = this.p;
-             short var53;
-             if (var52 == 0) {
-                var53 = 220;
-             } else {
-                var53 = 140;
-             }
+    static int bgAl(float a) {
+        int v = (int) a;
+        return v < 0 ? 0 : v > 255 ? 255 : v;
+    }
 
-             var56.setAlpha(var53);
-             var1.drawRect(var39, var33, var39 + var26, var33 + var26, this.p);
-          }
-       } else {
-          for (int var51 = 0; var51 < 24; var51++) {
-             float var29 = (float)(var51 % 4 * 9 + 16);
-             float var41 = this.bgS;
-             float var47 = this.groundY;
-             double var22 = (double)var51;
-             double var24 = (double)var9;
-             float var35 = this.time;
-             var29 = var47 - (float)((0.083 * var22 * var24 + (double)(var29 * var41 * var35)) % var24);
-             var35 = (float)((0.113 * var22 * (double)this.W + Math.sin((double)var35 * 1.3 + var22) * (double)this.bgS * 5.0) % (double)this.W);
-             var41 = (var29 - this.battleT) / var9;
-             Paint var57 = this.p;
-             int var54;
-             if (var51 % 3 == 0) {
-                var54 = -11430;
-             } else {
-                var54 = -38342;
-             }
+    static float bgWrap(float v, float m) {
+        if (!(m > 0f)) return 0f;
+        float r = v % m;
+        return r < 0f ? r + m : r;
+    }
 
-             var57.setColor(var54);
-             this.p.setAlpha((int)((double)(var41 * 230.0F) * (Math.sin((double)(this.time * 9.0F + (float)var51)) * 0.4 + 0.6)));
-             var41 = this.bgS;
-             var1.drawRect(var35, var29, var35 + var41 * 0.8F, var29 + var41 * 0.8F, this.p);
-          }
-       }
+    static float bgHash(int n) {
+        n = (n << 13) ^ n;
+        n = n * (n * n * 15731 + 789221) + 1376312589;
+        return (n & 0x7fffffff) / 2147483648f;
+    }
 
-       this.p.setAlpha(255);
+    static float bgSin(float a) {
+        return (float) Math.sin(a);
+    }
+
+    // wind for grass and flowers: idle sway + a gust wave rolling left to right + frenzy flutter
+    float bgWind(float x, float t, int i) {
+        float w = bgSin(t * 1.8f + i * 0.9f) * 0.7f;
+        float g = bgSin(t * 0.55f - x / Math.max(1f, this.W) * 3.5f);
+        if (g > 0f) w += g * g * g * 2.4f;
+        return w + this.bgFz * bgSin(t * 11f + i * 1.7f) * 0.7f;
+    }
+
+    boolean bgNearMoon(int bi, float x, float y, float pad) {
+        float r = this.bgMoonR[bi];
+        if (r <= 0f) return false;
+        float dx = x + 0.5f - this.bgMoonU[bi];
+        float dy = y + 0.5f - this.bgMoonV[bi];
+        return dx * dx + dy * dy < (r + pad) * (r + pad);
+    }
+
+    static boolean bgMoonPx(int c) {
+        int r = (c >> 16) & 255;
+        return r >= 200 && r - (c & 255) >= 40;
+    }
+
+    // one-off analysis of the background art: moon, painted stars, glowing spots, free sky for new stars
+    void bgScan(Bitmap b, int bi) {
+        this.bgScanBmp[bi] = b;
+        this.bgMoonR[bi] = 0f;
+        this.bgStarN[bi] = 0;
+        this.bgGlintN[bi] = 0;
+        this.bgSpotN[bi] = 0;
+        int w = b.getWidth();
+        int h = b.getHeight();
+        if (w < 8 || h < 8) return;
+        this.bgBw[bi] = w;
+        this.bgBh[bi] = h;
+        int n = w * h;
+        if (this.bgPix == null || this.bgPix.length < n) this.bgPix = new int[n];
+        int[] px = this.bgPix;
+        try {
+            b.getPixels(px, 0, w, 0, 0, w, h);
+        } catch (RuntimeException e) {
+            return;
+        }
+        this.bgSkyC[bi] = px[0] | 0xFF000000;
+        this.bgFloorC[bi] = px[n - w] | 0xFF000000;
+        // moon: densest 8x8 block of bright warm pixels in the upper sky, refined by centroid
+        int skyRows = h * 45 / 100;
+        int bestN = 0;
+        int bestX = 0;
+        int bestY = 0;
+        for (int by = 0; by < skyRows; by += 8) {
+            for (int bx = 0; bx < w; bx += 8) {
+                int m = 0;
+                for (int y = by; y < Math.min(skyRows, by + 8); y++) {
+                    for (int x = bx; x < Math.min(w, bx + 8); x++) {
+                        if (bgMoonPx(px[y * w + x])) m++;
+                    }
+                }
+                if (m > bestN) {
+                    bestN = m;
+                    bestX = bx + 4;
+                    bestY = by + 4;
+                }
+            }
+        }
+        if (bestN >= 6) {
+            float cx = bestX;
+            float cy = bestY;
+            int cnt = 0;
+            for (int it = 0; it < 3; it++) {
+                float sx = 0f;
+                float sy = 0f;
+                int m = 0;
+                for (int y = 0; y < skyRows; y++) {
+                    for (int x = 0; x < w; x++) {
+                        float dx = x - cx;
+                        float dy = y - cy;
+                        if (dx * dx + dy * dy < 256f && bgMoonPx(px[y * w + x])) {
+                            sx += x;
+                            sy += y;
+                            m++;
+                        }
+                    }
+                }
+                if (m == 0) break;
+                cx = sx / m;
+                cy = sy / m;
+                cnt = m;
+            }
+            if (cnt >= 12) {
+                this.bgMoonU[bi] = cx + 0.5f;
+                this.bgMoonV[bi] = cy + 0.5f;
+                this.bgMoonR[bi] = (float) Math.sqrt(cnt / Math.PI);
+            }
+        }
+        // painted stars (bright neutral pixels) get an occasional sparkle
+        int lim = h * 6 / 10;
+        int total = 0;
+        for (int y = 0; y < lim; y++) {
+            for (int x = 0; x < w; x++) {
+                int c = px[y * w + x];
+                int mn = Math.min((c >> 16) & 255, Math.min((c >> 8) & 255, c & 255));
+                if (mn >= 0x90 && !bgNearMoon(bi, x, y, 3f)) total++;
+            }
+        }
+        int stride = Math.max(1, (total + 19) / 20);
+        int seen = 0;
+        int gn = 0;
+        for (int y = 0; y < lim && gn < 20; y++) {
+            for (int x = 0; x < w && gn < 20; x++) {
+                int c = px[y * w + x];
+                int mn = Math.min((c >> 16) & 255, Math.min((c >> 8) & 255, c & 255));
+                if (mn >= 0x90 && !bgNearMoon(bi, x, y, 3f)) {
+                    if (seen % stride == 0) {
+                        this.bgGlintU[bi * 20 + gn] = x;
+                        this.bgGlintV[bi * 20 + gn] = y;
+                        gn++;
+                    }
+                    seen++;
+                }
+            }
+        }
+        this.bgGlintN[bi] = gn;
+        // glowing spots: saturated bright pixels (crystals, castle windows), clustered into cells
+        int cs = 6;
+        while ((w / cs + 1) * (h / cs + 1) * 4 > this.bgCells.length) cs++;
+        int cw = w / cs + 1;
+        int cells = cw * (h / cs + 1);
+        int[] cl = this.bgCells;
+        java.util.Arrays.fill(cl, 0, cells * 4, 0);
+        for (int y = h / 4; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int c = px[y * w + x];
+                int r = (c >> 16) & 255;
+                int g = (c >> 8) & 255;
+                int bb = c & 255;
+                int mx = Math.max(r, Math.max(g, bb));
+                int mn = Math.min(r, Math.min(g, bb));
+                if (mx >= 0xC0 && mn < 0xA0 && !bgNearMoon(bi, x, y, 3f)) {
+                    int ci = ((y / cs) * cw + x / cs) * 4;
+                    cl[ci] += x;
+                    cl[ci + 1] += y;
+                    cl[ci + 2]++;
+                    cl[ci + 3] = c;
+                }
+            }
+        }
+        int sn = 0;
+        for (int ci = 0; ci < cells && sn < 24; ci++) {
+            int m = cl[ci * 4 + 2];
+            if (m >= 2) {
+                this.bgSpotU[bi * 24 + sn] = (float) cl[ci * 4] / m + 0.5f;
+                this.bgSpotV[bi * 24 + sn] = (float) cl[ci * 4 + 1] / m + 0.5f;
+                this.bgSpotC[bi * 24 + sn] = cl[ci * 4 + 3] | 0xFF000000;
+                sn++;
+            }
+        }
+        this.bgSpotN[bi] = sn;
+        // extra twinkling stars on flat stretches of sky (or cave wall)
+        int y0 = bi == 1 ? h / 5 : 1;
+        int y1 = bi == 1 ? h * 55 / 100 : h * 42 / 100;
+        int s = 0x5EED + bi * 7919;
+        int st = 0;
+        for (int a = 0; a < 800 && st < 22; a++) {
+            s = s * 1103515245 + 12345;
+            int x = 1 + ((s >>> 8) % (w - 2));
+            s = s * 1103515245 + 12345;
+            int y = y0 + ((s >>> 8) % Math.max(1, y1 - y0));
+            if (y < 1 || y >= h - 1) continue;
+            int c = px[y * w + x];
+            if (c != px[y * w] || c != px[y * w + x - 1] || c != px[y * w + x + 1]
+                    || c != px[(y - 1) * w + x] || c != px[(y + 1) * w + x]) continue;
+            if (bgNearMoon(bi, x, y, 4f)) continue;
+            boolean dup = false;
+            for (int k = 0; k < st; k++) {
+                if (Math.abs(this.bgStarU[bi * 22 + k] - x) + Math.abs(this.bgStarV[bi * 22 + k] - y) < 5f) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (dup) continue;
+            this.bgStarU[bi * 22 + st] = x;
+            this.bgStarV[bi * 22 + st] = y;
+            st++;
+        }
+        this.bgStarN[bi] = st;
+    }
+
+    // rebuilds cached shaders/paths only when size, layout or biome change
+    void bgEnsure(Bitmap bmp, int bi) {
+        if (bmp != null && this.bgScanBmp[bi] != bmp) {
+            bgScan(bmp, bi);
+            this.bgKeyBi = -1;
+        }
+        float u = this.bgS;
+        float W = this.W;
+        this.bgTop = this.groundY - u * 96f;
+        this.bgBx = W / Math.max(1, this.bgBw[bi]);
+        if (this.bgKeyBi == bi && this.bgKeyW == W && this.bgKeyT == this.battleT
+                && this.bgKeyB == this.battleB && this.bgKeyG == this.groundY) return;
+        this.bgKeyBi = bi;
+        this.bgKeyW = W;
+        this.bgKeyT = this.battleT;
+        this.bgKeyB = this.battleB;
+        this.bgKeyG = this.groundY;
+        float top = this.bgTop;
+        float T = this.battleT;
+        float B = this.battleB;
+        float G = this.groundY;
+        Shader.TileMode cl = Shader.TileMode.CLAMP;
+        int sky = this.bgSkyC[bi];
+        int floor = this.bgFloorC[bi];
+        this.bgSkyP.setShader(new android.graphics.LinearGradient(0f, T, 0f, Math.max(T + 1f, top),
+                bgShade(sky, 0.5f), sky, cl));
+        float bottom = top + this.bgBh[bi] * u;
+        this.bgFloorP.setShader(new android.graphics.LinearGradient(0f, bottom, 0f, Math.max(bottom + 1f, B),
+                floor, bgShade(floor, 0.45f), cl));
+        int lc = bgLightCol[bi];
+        float mr = this.bgMoonR[bi] * u;
+        this.bgMR = mr;
+        if (mr > 0f) {
+            float mx = this.bgMoonU[bi] * this.bgBx;
+            float my = top + this.bgMoonV[bi] * u;
+            this.bgMX = mx;
+            this.bgMY = my;
+            float R = mr * (bi == 2 ? 6.5f : 5.5f);
+            this.bgHaloR = R;
+            float rr = Math.min(0.5f, mr / R);
+            this.bgHaloP.setShader(new RadialGradient(mx, my, R,
+                    new int[]{bgA(lc, 0x48), bgA(lc, 0x3C), bgA(lc, 0x12), bgA(lc, 0)},
+                    new float[]{0f, rr, rr + (1f - rr) * 0.35f, 1f}, cl));
+            float L = mr * 9f;
+            this.bgRayP.setShader(new RadialGradient(0f, 0f, L,
+                    new int[]{bgA(lc, 0x40), bgA(lc, 0x1A), bgA(lc, 0)}, new float[]{0f, 0.4f, 1f}, cl));
+            Path rp = this.bgRayPath;
+            rp.reset();
+            for (int k = 0; k < 12; k++) {
+                double a = k * Math.PI / 6.0 + ((k * 7) % 5) * 0.06;
+                float len = L * (k % 2 == 0 ? 1f : 0.6f) * (k % 3 == 0 ? 1f : 0.85f);
+                double h0 = 0.10;
+                double h1 = 0.018;
+                rp.moveTo((float) Math.cos(a - h0) * mr, (float) Math.sin(a - h0) * mr);
+                rp.lineTo((float) Math.cos(a - h1) * len, (float) Math.sin(a - h1) * len);
+                rp.lineTo((float) Math.cos(a + h1) * len, (float) Math.sin(a + h1) * len);
+                rp.lineTo((float) Math.cos(a + h0) * mr, (float) Math.sin(a + h0) * mr);
+                rp.close();
+            }
+        } else {
+            this.bgHaloP.setShader(null);
+            this.bgRayP.setShader(null);
+            this.bgMX = W * 0.5f;
+            this.bgMY = T;
+        }
+        for (int k = 0; k < 3; k++) this.bgShaft[k].reset();
+        if (bi == 1) {
+            // light falling through cracks in the cave ceiling
+            float oy = top + 5f * u;
+            for (int k = 0; k < 3; k++) {
+                float ox = (0.17f + 0.33f * k + 0.04f * bgHash(k + 9)) * W;
+                float dx = 0.09f * W;
+                float w0 = (2f + k) * u * 0.5f;
+                float w1 = (7f + 3f * k) * u * 0.5f;
+                Path sp = this.bgShaft[k];
+                sp.moveTo(ox - w0, oy);
+                sp.lineTo(ox + w0, oy);
+                sp.lineTo(ox + dx + w1, G);
+                sp.lineTo(ox + dx - w1, G);
+                sp.close();
+                this.bgShaftO[k * 2] = ox;
+                this.bgShaftO[k * 2 + 1] = oy;
+            }
+            this.bgShaftP.setShader(new android.graphics.LinearGradient(0f, oy, 0f, Math.max(oy + 1f, G),
+                    new int[]{bgA(lc, 0x3A), bgA(lc, 0x12), bgA(lc, 0)}, new float[]{0f, 0.6f, 1f}, cl));
+        } else if (mr > 0f) {
+            // moonbeams slanting from the moon toward the middle of the field
+            float ox = this.bgMX;
+            float oy = this.bgMY;
+            float dir = ox > W * 0.5f ? -1f : 1f;
+            for (int k = 0; k < 3; k++) {
+                float gx = ox + dir * (0.16f + 0.17f * k) * W;
+                float vx = gx - ox;
+                float vy = G - oy;
+                float len = (float) Math.sqrt(vx * vx + vy * vy);
+                this.bgShaftO[k * 2] = ox;
+                this.bgShaftO[k * 2 + 1] = oy;
+                if (len < 1f) continue;
+                float nx = -vy / len;
+                float ny = vx / len;
+                float w0 = mr * (0.55f + 0.2f * k);
+                float w1 = (5f + 3.5f * k) * u;
+                float sx = ox + vx / len * mr * 1.3f;
+                float sy = oy + vy / len * mr * 1.3f;
+                Path sp = this.bgShaft[k];
+                sp.moveTo(sx + nx * w0, sy + ny * w0);
+                sp.lineTo(sx - nx * w0, sy - ny * w0);
+                sp.lineTo(gx - nx * w1, G - ny * w1);
+                sp.lineTo(gx + nx * w1, G + ny * w1);
+                sp.close();
+            }
+            this.bgShaftP.setShader(new android.graphics.LinearGradient(ox, oy, ox + dir * 0.3f * W, Math.max(oy + 1f, G),
+                    new int[]{bgA(lc, 0x30), bgA(lc, 0x12), bgA(lc, 0)}, new float[]{0f, 0.55f, 1f}, cl));
+        } else {
+            this.bgShaftP.setShader(null);
+        }
+        int hr = bi == 0 ? 62 : bi == 1 ? 66 : 74;
+        this.bgHazeT = top + (hr - 16) * u;
+        this.bgHazeB = top + (hr + 12) * u;
+        int hc = bgHazeCol[bi];
+        this.bgHazeP.setShader(new android.graphics.LinearGradient(0f, this.bgHazeT, 0f, Math.max(this.bgHazeT + 1f, this.bgHazeB),
+                new int[]{bgA(hc, 0), bgA(hc, 0x4C), bgA(hc, 0)}, new float[]{0f, 0.6f, 1f}, cl));
+        int ec = bgEdgeCol[bi];
+        float g0 = G + 2f * u;
+        this.bgGroundP.setShader(new android.graphics.LinearGradient(0f, g0, 0f, Math.max(g0 + 1f, B),
+                new int[]{bgA(ec, 0x60), bgA(ec, 0x18), bgA(ec, 0x88)}, new float[]{0f, 0.2f, 1f}, cl));
+        float lx = bi == 1 ? W * 0.5f : this.bgMX;
+        this.bgRimP.setShader(new android.graphics.LinearGradient(lx - 0.75f * W, 0f, lx + 0.75f * W, 0f,
+                new int[]{bgA(lc, 0), bgA(lc, 0x70), bgA(lc, 0)}, null, cl));
+        this.bgTintP.setShader(new android.graphics.LinearGradient(0f, T, 0f, Math.max(T + 1f, B),
+                new int[]{0x28FFC040, 0x0AFF8A30, 0x36FF2A10}, new float[]{0f, 0.5f, 1f}, cl));
+    }
+
+    // sky, background art (colour graded for boss/frenzy), atmosphere and frenzy tint
+    void bgDrawBackdrop(Canvas c, Bitmap bmp, long now, boolean frenzy) {
+        if (this.W <= 0 || this.H <= 0 || !(this.bgS > 0f)) return;
+        int bi = biome();
+        float t = this.time;
+        if (frenzy) {
+            if (this.bgFzOn == 0L || this.bgFzOn > now) this.bgFzOn = now;
+            float in = (now - this.bgFzOn) / 450f;
+            float out = (this.frenzyUntil - now) / 700f;
+            this.bgFz = Math.max(0f, Math.min(1f, Math.min(in, out)));
+        } else {
+            this.bgFzOn = 0L;
+            this.bgFz = 0f;
+        }
+        float dt = t - this.bgLastT;
+        this.bgLastT = t;
+        float target = bossFight() ? 1f : 0f;
+        if (dt > 0.5f || dt < 0f) {
+            this.bgBossA = target;
+        } else {
+            this.bgBossA += (target - this.bgBossA) * Math.min(1f, dt * 2.5f);
+            if (Math.abs(target - this.bgBossA) < 0.003f) this.bgBossA = target;
+        }
+        float ph = bgWrap(t, 1.3f) / 1.3f;
+        float d1 = Math.min(ph, 1f - ph) / 0.07f;
+        float d2 = (ph - 0.21f) / 0.07f;
+        this.bgBeat = Math.min(1f, (float) Math.exp(-d1 * d1) + 0.6f * (float) Math.exp(-d2 * d2));
+        bgEnsure(bmp, bi);
+        float top = this.bgTop;
+        float bottom = top + this.bgBh[bi] * this.bgS;
+        if (bmp == null) {
+            this.bgP.setColor(this.bgSkyC[bi]);
+            c.drawRect(0f, this.battleT, this.W, this.battleB, this.bgP);
+        } else {
+            if (top > this.battleT) c.drawRect(0f, this.battleT, this.W, top + 1f, this.bgSkyP);
+            LightingColorFilter cf = null;
+            if (this.bgBossA > 0.02f) {
+                float lv = this.bgBossA * (0.72f + 0.28f * this.bgBeat);
+                cf = this.bgBossCF[Math.max(0, Math.min(this.bgBossCF.length - 1, (int) (lv * this.bgBossCF.length)))];
+            } else if (this.bgFz > 0.02f) {
+                float lv = this.bgFz * (0.8f + 0.2f * bgSin(t * 6f));
+                cf = this.bgFzCF[Math.max(0, Math.min(this.bgFzCF.length - 1, (int) (lv * this.bgFzCF.length)))];
+            }
+            this.bgBmpP.setFilterBitmap(false);
+            this.bgBmpP.setColorFilter(cf);
+            this.bgSrc.set(0, 0, bmp.getWidth(), bmp.getHeight());
+            this.bgR.set(0f, top, this.W, bottom);
+            c.drawBitmap(bmp, this.bgSrc, this.bgR, this.bgBmpP);
+            if (bottom < this.battleB) c.drawRect(0f, bottom - 1f, this.W, this.battleB, this.bgFloorP);
+        }
+        drawAmbient(c);
+        if (this.bgFz > 0.01f) {
+            float pul = 0.62f + 0.22f * bgSin(t * 6f) + 0.16f * this.beatPulse;
+            this.bgTintP.setAlpha(bgAl(255f * this.bgFz * pul));
+            c.drawRect(0f, this.battleT, this.W, this.battleB, this.bgTintP);
+        }
+    }
+
+    void bgPixel(Canvas c, float x, float y, float s, int col, int a) {
+        this.bgP.setColor(col);
+        this.bgP.setAlpha(a);
+        c.drawRect(x, y, x + s, y + s, this.bgP);
+    }
+
+    void bgGlow(Canvas c, float x, float y, float r, int col, float a) {
+        if (a < 3f) return;
+        // three stepped discs read as a soft pixel-era bloom
+        this.bgGlowP.setColor(col);
+        this.bgGlowP.setAlpha(bgAl(a * 0.3f));
+        c.drawCircle(x, y, r, this.bgGlowP);
+        this.bgGlowP.setAlpha(bgAl(a * 0.45f));
+        c.drawCircle(x, y, r * 0.62f, this.bgGlowP);
+        this.bgGlowP.setAlpha(bgAl(a * 0.7f));
+        c.drawCircle(x, y, r * 0.32f, this.bgGlowP);
+    }
+
+    // four-arm pixel sparkle around the pixel at (x,y)
+    void bgSparkle(Canvas c, float x, float y, float s, int col, int a) {
+        Paint q = this.bgP;
+        q.setColor(col);
+        q.setAlpha(a);
+        c.drawRect(x - s, y, x, y + s, q);
+        c.drawRect(x + s, y, x + 2f * s, y + s, q);
+        c.drawRect(x, y - s, x + s, y, q);
+        c.drawRect(x, y + s, x + s, y + 2f * s, q);
+    }
+
+    void bgCloud(Canvas c, float x, float y, float s, int bi, int a, int shape) {
+        Paint q = this.bgP;
+        int o = shape * 16;
+        for (int row = 0; row < 8; row++) {
+            int col = row < 2 ? bgCloudCol[bi * 3 + 1] : row >= 6 ? bgCloudCol[bi * 3 + 2] : bgCloudCol[bi * 3];
+            q.setColor(col);
+            q.setAlpha(row < 2 ? Math.min(255, a + a / 2) : a);
+            c.drawRect(x + bgCloudRows[o + row * 2] * s, y + row * s, x + bgCloudRows[o + row * 2 + 1] * s, y + (row + 1) * s, q);
+        }
+    }
+
+    void bgDrawMoon(Canvas c, int bi, float t) {
+        if (this.bgMR <= 0f || this.bgHaloP.getShader() == null) return;
+        float br = bi == 2 ? 0.78f + 0.22f * bgSin(t * 1.1f) : 0.86f + 0.14f * bgSin(t * 0.6f);
+        if (this.bgBossA > 0f) br = Math.min(1f, br + 0.25f * this.bgBossA * this.bgBeat);
+        this.bgHaloP.setAlpha(bgAl(255f * br));
+        c.drawCircle(this.bgMX, this.bgMY, this.bgHaloR, this.bgHaloP);
+        if (this.bgRayP.getShader() != null) {
+            this.bgRayP.setAlpha(bgAl(255f * (0.6f + 0.4f * bgSin(t * 0.45f))));
+            c.save();
+            c.translate(this.bgMX, this.bgMY);
+            c.rotate(bgWrap(t * 2.5f, 360f));
+            c.drawPath(this.bgRayPath, this.bgRayP);
+            c.restore();
+        }
+    }
+
+    void bgDrawSky(Canvas c, int bi, float t, float u) {
+        float top = this.bgTop;
+        float bx = this.bgBx;
+        float minY = this.battleT - u;
+        // twinkling stars on clear sky
+        int n = this.bgStarN[bi];
+        int c1 = bgStarCol[bi * 2];
+        int c2 = bgStarCol[bi * 2 + 1];
+        for (int k = 0; k < n; k++) {
+            float x = this.bgStarU[bi * 22 + k] * bx;
+            float y = top + this.bgStarV[bi * 22 + k] * u;
+            if (y < minY) continue;
+            float tw = 0.5f + 0.5f * bgSin(t * (1.1f + (k % 5) * 0.33f) + k * 2.39f);
+            tw *= tw;
+            int col = k % 3 == 0 ? c2 : c1;
+            float a = (bi == 1 ? 140f : 220f) * tw + 25f;
+            bgPixel(c, x, y, u, col, bgAl(a));
+            if (tw > 0.8f && k % 2 == 0) bgSparkle(c, x, y, u, col, bgAl((tw - 0.8f) * 5f * a * 0.6f));
+        }
+        // painted stars in the art flare now and then
+        n = this.bgGlintN[bi];
+        for (int k = 0; k < n; k++) {
+            float f = bgSin(t * (0.7f + (k % 4) * 0.15f) + k * 1.7f);
+            if (f < 0.72f) continue;
+            float x = this.bgGlintU[bi * 20 + k] * bx;
+            float y = top + this.bgGlintV[bi * 20 + k] * u;
+            if (y < minY) continue;
+            float a = (f - 0.72f) / 0.28f;
+            bgSparkle(c, x, y, u, 0xFFFFFFFF, bgAl(170f * a));
+            bgGlow(c, x + u * 0.5f, y + u * 0.5f, u * 2.4f, c1, 60f * a);
+        }
+        // shooting star (not inside the cave)
+        if (bi != 1) {
+            float per = bi == 0 ? 7.5f : 9.5f;
+            int idx = (int) Math.floor(t / per);
+            float p = (t - idx * per) / 0.9f;
+            if (p >= 0f && p < 1f) {
+                float sx = (0.35f + 0.6f * bgHash(idx * 7 + bi)) * this.W;
+                float sy = Math.max(this.battleT + 2f * u, top + (4f + 26f * bgHash(idx * 13 + 5)) * u);
+                float dx = -0.42f * this.W;
+                float dy = 0.16f * this.W;
+                float fade = bgSin(p * 3.1415927f);
+                float hx = sx + dx * p;
+                float hy = sy + dy * p;
+                for (int s = 11; s >= 0; s--) {
+                    float k = 1f - s / 12f;
+                    float px = hx - dx * 0.022f * s;
+                    float py = hy - dy * 0.022f * s;
+                    float sz = s < 2 ? u : u * 0.7f;
+                    bgPixel(c, px, py, sz, s < 3 ? 0xFFFFFFFF : c1, bgAl(255f * fade * k * k));
+                }
+                bgGlow(c, hx + u * 0.5f, hy + u * 0.5f, u * 3f, c1, 90f * fade);
+            }
+        }
+    }
+
+    void bgDrawClouds(Canvas c, int bi, float t, float u) {
+        float W = this.W;
+        float top = Math.max(this.bgTop, this.battleT - 2f * u);
+        if (bi == 1) {
+            // slow drifting banks of cave haze instead of clouds
+            for (int k = 0; k < 4; k++) {
+                float s = u * (1.3f + 0.3f * (k % 2));
+                float wd = 31f * s;
+                float x = bgWrap(bgHash(k * 9 + 2) * (W + wd) + t * (1.0f + 0.4f * k) * u * (k % 2 == 0 ? 1f : -1f), W + wd) - wd;
+                float y = top + (26f + 9f * k) * u;
+                bgCloud(c, x, y, s, 1, bgAl(14f + 8f * bgSin(t * 0.5f + k * 1.9f)), k % 2);
+            }
+            return;
+        }
+        int yMin = bi == 2 ? 2 : 4;
+        int ySpan = bi == 2 ? 12 : 30;
+        // far layer: small, slow, faint
+        for (int k = 0; k < 3; k++) {
+            float s = u * 0.9f;
+            float wd = 31f * s;
+            float x = bgWrap(bgHash(k * 3 + bi) * (W + wd) + t * (1.4f + 0.3f * k) * u, W + wd) - wd;
+            float y = top + (yMin + bgHash(k * 11 + 4) * ySpan * 0.6f) * u;
+            bgCloud(c, x, y, s, bi, bi == 2 ? 130 : 80, k % 2);
+        }
+        // near layer: bigger, faster, denser
+        for (int k = 0; k < 2; k++) {
+            float s = u * 1.4f;
+            float wd = 31f * s;
+            float x = bgWrap(bgHash(k * 5 + 17 + bi) * (W + wd) + t * (3.2f + 0.8f * k) * u, W + wd) - wd;
+            float y = top + (yMin + ySpan * 0.45f + bgHash(k * 7 + 23) * ySpan * 0.5f) * u;
+            bgCloud(c, x, y, s, bi, bi == 2 ? 170 : 120, (k + 1) % 2);
+        }
+    }
+
+    void bgDrawShafts(Canvas c, int bi, float t) {
+        if (this.bgShaftP.getShader() == null) return;
+        float base = bi == 1 ? 0.7f : 0.55f;
+        for (int k = 0; k < 3; k++) {
+            float a = base + (1f - base) * bgSin(t * (0.5f + 0.13f * k) + k * 2.1f);
+            this.bgShaftP.setAlpha(bgAl(255f * a * 0.42f));
+            float rot = bgSin(t * 0.23f + k * 1.7f) * 1.6f;
+            // three slightly fanned passes give the beam soft edges
+            for (int e = -1; e <= 1; e++) {
+                c.save();
+                c.rotate(rot + e * 1.3f, this.bgShaftO[k * 2], this.bgShaftO[k * 2 + 1]);
+                c.drawPath(this.bgShaft[k], this.bgShaftP);
+                c.restore();
+            }
+        }
+    }
+
+    void bgDrawSpots(Canvas c, int bi, float t, float u) {
+        if (bi == 0) return;
+        int n = this.bgSpotN[bi];
+        float top = this.bgTop;
+        for (int k = 0; k < n; k++) {
+            float x = this.bgSpotU[bi * 24 + k] * this.bgBx;
+            float y = top + this.bgSpotV[bi * 24 + k] * u;
+            int col = this.bgSpotC[bi * 24 + k];
+            if (bi == 2) {
+                // candle-lit castle windows flicker
+                float f = 0.62f + 0.22f * bgSin(t * 6.3f + k * 2.1f) + 0.16f * bgSin(t * 15.7f + k * 4.7f);
+                bgGlow(c, x, y, u * 2.6f, 0xFFFFB23E, 70f * f);
+            } else {
+                // crystals breathe light
+                float f = 0.5f + 0.5f * bgSin(t * 1.4f + k * 1.3f);
+                bgGlow(c, x, y, u * 3.4f, col, 30f + 45f * f);
+                if (f > 0.93f && k % 2 == 0) bgSparkle(c, x - u * 0.5f, y - u * 1.5f, u * 0.7f, 0xFFFFFFFF, bgAl((f - 0.93f) / 0.07f * 220f));
+            }
+        }
+    }
+
+    void bgDrawForest(Canvas c, float t, float u, float sky) {
+        float W = this.W;
+        float G = this.groundY;
+        // fireflies with soft glow, drifting and blinking
+        for (int k = 0; k < 14; k++) {
+            float bx = (0.04f + 0.92f * bgHash(k * 31 + 1)) * W;
+            float by = G - 3f * u - bgHash(k * 17 + 2) * 0.5f * sky;
+            float x = bx + bgSin(t * (0.31f + 0.07f * (k % 4)) + k * 1.9f) * 0.07f * W + bgSin(t * 1.13f + k) * 1.2f * u;
+            float y = by + bgSin(t * (0.43f + 0.05f * (k % 3)) + k * 2.7f) * 5f * u;
+            float b = 0.5f + 0.5f * bgSin(t * (1.6f + 0.25f * (k % 5)) + k * 2.3f);
+            b = b * b * b;
+            bgGlow(c, x, y, u * 4.2f, 0xFFD8FF60, 95f * b);
+            bgPixel(c, x - u * 0.45f, y - u * 0.45f, u * 0.9f, 0xFFF0FFB0, bgAl(50f + 205f * b));
+        }
+        // leaves tumbling down
+        for (int k = 0; k < 6; k++) {
+            float per = 7f + 2.3f * k;
+            float p = bgWrap(t + k * 3.7f, per) / per;
+            float y = this.battleT - 2f * u + p * (G + 2f * u - this.battleT);
+            float x = bgWrap(bgHash(k * 19 + 7) * W + t * (2f + k * 0.5f) * u + bgSin(t * 1.7f + k * 2f) * 3f * u, W + 4f * u) - 2f * u;
+            int a = bgAl(210f * Math.min(1f, (1f - p) / 0.08f));
+            int col = bgLeafCol[k % 3];
+            this.bgP.setColor(col);
+            this.bgP.setAlpha(a);
+            float s = u * 0.75f;
+            if (bgSin(t * 3.1f + k * 1.3f) > 0f) {
+                c.drawRect(x, y, x + 2f * s, y + s, this.bgP);
+                this.bgP.setColor(bgShade(col, 0.6f));
+                this.bgP.setAlpha(a);
+                c.drawRect(x + 2f * s, y + s * 0.5f, x + 2.5f * s, y + s, this.bgP);
+            } else {
+                c.drawRect(x + s * 0.5f, y - s * 0.5f, x + s * 1.5f, y + s * 1.5f, this.bgP);
+            }
+        }
+    }
+
+    void bgDrawCave(Canvas c, float t, float u, float sky) {
+        float W = this.W;
+        float G = this.groundY;
+        // crystal motes rising
+        float span = sky + 4f * u;
+        for (int k = 0; k < 24; k++) {
+            float sp = (2.5f + (k % 5) * 1.1f) * u;
+            float d = bgWrap(k * 0.137f * span + t * sp, span);
+            float y = G + 2f * u - d;
+            float x = bgWrap(bgHash(k * 23 + 3) * W + bgSin(t * 0.7f + k * 1.3f) * 4f * u, W);
+            float a = bgSin(d / span * 3.1415927f);
+            float tw = 0.6f + 0.4f * bgSin(t * 3.3f + k * 1.7f);
+            int col = bgMoteCol[k % 4];
+            if (k % 3 == 0) {
+                bgGlow(c, x, y, u * 2.4f, col, 80f * a * tw);
+                bgPixel(c, x - u * 0.5f, y - u * 0.5f, u, col, bgAl(255f * a * tw));
+                if (tw > 0.96f) bgSparkle(c, x - u * 0.5f, y - u * 0.5f, u, 0xFFFFFFFF, bgAl(160f * a));
+            } else {
+                bgPixel(c, x - u * 0.3f, y - u * 0.3f, u * 0.6f, col, bgAl(190f * a * tw));
+            }
+        }
+        // water dripping from the stalactites, splashing on the floor
+        float top = this.bgTop;
+        for (int k = 0; k < 4; k++) {
+            float x = (float) Math.floor((0.12f + 0.25f * k + 0.05f * bgHash(k + 40)) * W / u) * u;
+            float y0 = Math.max(this.battleT + u, top + (10f + 4f * bgHash(k + 50)) * u);
+            float per = 3.4f + 0.9f * k;
+            float p = bgWrap(t + k * 1.1f, per) / per;
+            if (p < 0.45f) {
+                float g = p / 0.45f;
+                float s = u * (0.3f + 0.6f * g);
+                bgPixel(c, x + (u - s) * 0.5f, y0, s, 0xFF9CECFF, bgAl(210f * g));
+            } else if (p < 0.72f) {
+                float f = (p - 0.45f) / 0.27f;
+                float y = y0 + (G - u - y0) * f * f;
+                this.bgP.setColor(0xFF9CECFF);
+                this.bgP.setAlpha(90);
+                c.drawRect(x + u * 0.3f, y - 1.6f * u, x + u * 0.7f, y, this.bgP);
+                bgPixel(c, x + u * 0.1f, y, u * 0.8f, 0xFFDCF8FF, 220);
+            } else if (p < 0.88f) {
+                float f = (p - 0.72f) / 0.16f;
+                int a = bgAl(210f * (1f - f));
+                for (int j = 0; j < 2; j++) {
+                    float off = (1.2f + j * 1.4f) * f * 2f * u;
+                    float sy = G - u - bgSin(f * 3.1415927f) * (1.5f + j) * u;
+                    bgPixel(c, x - off, sy, u * 0.5f, 0xFF9CECFF, a);
+                    bgPixel(c, x + u * 0.5f + off, sy, u * 0.5f, 0xFF9CECFF, a);
+                }
+                this.bgLineP.setStyle(Paint.Style.STROKE);
+                this.bgLineP.setStrokeWidth(u * 0.3f);
+                this.bgLineP.setColor(0xFF9CECFF);
+                this.bgLineP.setAlpha(bgAl(150f * (1f - f)));
+                float rw = (1f + 4f * f) * u;
+                this.bgR.set(x + u * 0.5f - rw, G - u * 0.2f - rw * 0.25f, x + u * 0.5f + rw, G - u * 0.2f + rw * 0.25f);
+                c.drawOval(this.bgR, this.bgLineP);
+            }
+        }
+    }
+
+    void bgDrawCastle(Canvas c, float t, float u, float sky) {
+        float W = this.W;
+        float G = this.groundY;
+        // embers rising from the battlefield
+        for (int k = 0; k < 22; k++) {
+            float sp = (5f + (k % 4) * 2.5f) * u;
+            float d = bgWrap(0.083f * k * sky + t * sp, sky);
+            float y = G - d;
+            float x = bgWrap(0.113f * k * W + bgSin(t * 1.3f + k) * 5f * u + bgSin(t * 0.37f + k * 2f) * 8f * u, W);
+            float a = (1f - d / sky) * (0.6f + 0.4f * bgSin(t * 9f + k));
+            int col = bgEmberCol[k % 3];
+            if (k % 2 == 0) bgGlow(c, x, y, u * 2f, 0xFFFF6A3A, 90f * a);
+            bgPixel(c, x - u * 0.4f, y - u * 0.4f, u * 0.8f, col, bgAl(240f * a));
+        }
+        // ash drifting down
+        for (int k = 0; k < 10; k++) {
+            float sp = (3f + (k % 3)) * u;
+            float d = bgWrap(k * 0.29f * sky + t * sp, sky);
+            float y = this.battleT + d;
+            float x = bgWrap(bgHash(k * 41) * W + bgSin(t * 0.9f + k * 1.7f) * 6f * u - t * 2f * u, W);
+            int a = bgAl(120f * bgSin(d / sky * 3.1415927f));
+            this.bgP.setColor(0xFF8E686D);
+            this.bgP.setAlpha(a);
+            float s = u * 0.6f;
+            if (bgSin(t * 2f + k) > 0f) c.drawRect(x, y, x + 1.6f * s, y + s, this.bgP);
+            else c.drawRect(x, y, x + s, y + 1.6f * s, this.bgP);
+        }
+        // bats flapping across the blood moon
+        Paint q = this.bgP;
+        float top = this.bgTop;
+        for (int k = 0; k < 3; k++) {
+            float s = (0.55f + 0.2f * k) * u;
+            float span = W + 16f * s;
+            float x = bgWrap(bgHash(k * 53) * span + t * (9f + 4f * k) * u * (k == 1 ? -1f : 1f), span) - 8f * s;
+            float y = top + (18f + 11f * k) * u + bgSin(t * 2.3f + k * 2f) * 2.5f * u + bgSin(t * 0.6f + k) * 4f * u;
+            if (y < this.battleT) continue;
+            boolean up = ((int) bgWrap(t * 9f + k * 3f, 2f)) == 0;
+            q.setColor(0xFF0A0408);
+            q.setAlpha(235);
+            c.drawRect(x - s, y - s, x + s, y + s, q);
+            c.drawRect(x - s, y - 2f * s, x - s * 0.4f, y - s, q);
+            c.drawRect(x + s * 0.4f, y - 2f * s, x + s, y - s, q);
+            if (up) {
+                c.drawRect(x - 3f * s, y - 2f * s, x - s, y, q);
+                c.drawRect(x + s, y - 2f * s, x + 3f * s, y, q);
+                c.drawRect(x - 5f * s, y - 3f * s, x - 3f * s, y - s, q);
+                c.drawRect(x + 3f * s, y - 3f * s, x + 5f * s, y - s, q);
+            } else {
+                c.drawRect(x - 3f * s, y, x - s, y + s, q);
+                c.drawRect(x + s, y, x + 3f * s, y + s, q);
+                c.drawRect(x - 5f * s, y + s, x - 3f * s, y + 2f * s, q);
+                c.drawRect(x + 3f * s, y + s, x + 5f * s, y + 2f * s, q);
+            }
+        }
+    }
+
+    // frenzy: hot sparks shooting up from the battlefield
+    void bgDrawHeat(Canvas c, float t, float u, float sky) {
+        float W = this.W;
+        float G = this.groundY;
+        float fz = this.bgFz;
+        for (int k = 0; k < 14; k++) {
+            float sp = (14f + (k % 4) * 6f) * u;
+            float d = bgWrap(k * 0.23f * sky + t * sp, sky);
+            float y = G - d;
+            float x = bgWrap(bgHash(k * 29 + 11) * W + bgSin(t * 2.1f + k) * 3f * u, W);
+            float a = fz * (1f - d / sky);
+            int col = k % 2 == 0 ? 0xFFFFD35A : 0xFFFF7A2A;
+            if (k % 3 == 0) bgGlow(c, x, y, u * 2.2f, col, 110f * a);
+            this.bgP.setColor(col);
+            this.bgP.setAlpha(bgAl(255f * a));
+            c.drawRect(x - u * 0.35f, y - u * 1.4f, x + u * 0.35f, y, this.bgP);
+        }
+    }
+
+    void bgDrawMist(Canvas c, int bi, float t, float u) {
+        float W = this.W;
+        float G = this.groundY;
+        Paint q = this.bgP;
+        int col = bgMistCol[bi];
+        float base = bi == 0 ? 30f : bi == 1 ? 34f : 40f;
+        for (int k = 0; k < 7; k++) {
+            float w = (24f + 14f * bgHash(k * 3 + bi)) * u;
+            float sp = (1.5f + k * 0.6f) * u * (k % 2 == 0 ? 1f : -1f);
+            float x = bgWrap(bgHash(k * 11 + bi * 5) * W + t * sp, W + w) - w;
+            float cy = G - (0.5f + 2.5f * bgHash(k * 17 + 3)) * u;
+            q.setColor(col);
+            q.setAlpha(bgAl(base * (0.7f + 0.3f * bgSin(t * 0.5f + k))));
+            c.drawRect(x, cy - u, x + w, cy + u, q);
+            c.drawRect(x + 0.15f * w, cy - 2.5f * u, x + 0.85f * w, cy - u, q);
+            c.drawRect(x + 0.32f * w, cy - 3.5f * u, x + 0.68f * w, cy - 2.5f * u, q);
+        }
+    }
+
+    void drawAmbient(Canvas c) {
+        float u = this.bgS;
+        if (this.W <= 0 || this.H <= 0 || !(u > 0f)) return;
+        int bi = biome();
+        if (this.bgKeyBi != bi) bgEnsure(this.bmBg[bi], bi);
+        float t = this.time;
+        float sky = Math.max(u, this.groundY - this.battleT);
+        bgDrawMoon(c, bi, t);
+        bgDrawSky(c, bi, t, u);
+        bgDrawClouds(c, bi, t, u);
+        c.drawRect(0f, this.bgHazeT, this.W, this.bgHazeB, this.bgHazeP);
+        bgDrawShafts(c, bi, t);
+        bgDrawSpots(c, bi, t, u);
+        if (bi == 0) {
+            bgDrawForest(c, t, u, sky);
+        } else if (bi == 1) {
+            bgDrawCave(c, t, u, sky);
+        } else {
+            bgDrawCastle(c, t, u, sky);
+        }
+        if (this.bgFz > 0.01f) bgDrawHeat(c, t, u, sky);
+        c.drawRect(0f, this.groundY + 2f * u, this.W, this.battleB, this.bgGroundP);
+        this.bgRimP.setAlpha(bgAl(255f * (0.7f + 0.3f * bgSin(t * 0.8f))));
+        c.drawRect(0f, this.groundY - u, this.W, this.groundY, this.bgRimP);
+        bgDrawMist(c, bi, t, u);
     }
 
     void drawBattle(Canvas canvas, long j) {
@@ -1888,19 +2676,7 @@ public class GameView extends View implements Runnable {
         Bitmap bitmap = this.bmBg[biome()];
         canvas.save();
         canvas.clipRect(0.0f, this.battleT, this.W, this.battleB);
-        this.p.setColor(bitmap.getPixel(OV_NONE, OV_NONE));
-        canvas.drawRect(0.0f, this.battleT, this.W, this.battleB, this.p);
-        float f2 = this.groundY - (this.bgS * 96.0f);
-        this.src.set(OV_NONE, OV_NONE, bitmap.getWidth(), bitmap.getHeight());
-        this.r.set(0.0f, f2, this.W, (bitmap.getHeight() * this.bgS) + f2);
-        canvas.drawBitmap(bitmap, this.src, this.r, this.bp);
-        this.p.setColor(bitmap.getPixel(OV_NONE, bitmap.getHeight() - 1));
-        canvas.drawRect(0.0f, this.r.bottom, this.W, this.battleB, this.p);
-        drawAmbient(canvas);
-        if (z) {
-            this.p.setColor(872364602);
-            canvas.drawRect(0.0f, this.battleT, this.W, this.battleB, this.p);
-        }
+        bgDrawBackdrop(canvas, bitmap, j, z);
         int i4 = this.compSel;
         if (i4 >= 0 && compUnlocked(i4)) {
             drawPrincess(canvas);
@@ -3043,26 +3819,116 @@ public class GameView extends View implements Runnable {
     }
 
     void drawGrass(Canvas canvas) {
-        int biome = biome();
-        int i = biome == 1 ? -7687984 : biome == 2 ? -9819616 : -13735382;
-        int i2 = biome == 1 ? -2297601 : biome == 2 ? -4698054 : -10764726;
-        float f = this.bgS;
-        for (int i3 = OV_NONE; i3 < 22; i3++) {
-            float f2 = (((i3 + 0.5f) * this.W) / 22) + ((((i3 * 37) % 7) - 3) * f);
-            float sin = ((float) Math.sin((this.time * 1.8d) + (i3 * 0.9d))) * f;
-            float f3 = f * (((i3 * OV_PORTRAIT) % 3) + 3);
-            float f4 = this.groundY + (2.2f * f);
-            this.p.setColor(i);
-            float f5 = f2 - f;
-            float f6 = f4 - f3;
-            canvas.drawRect(f5, f6, f2, f4, this.p);
-            float f7 = f * 2.0f;
-            canvas.drawRect((f2 - f7) + sin, f6 - f, f5 + sin, f6 + f, this.p);
-            this.p.setColor(i2);
-            float f8 = f4 - (f3 * 0.8f);
-            float f9 = f2 + f;
-            canvas.drawRect(f2, f8, f9, f4, this.p);
-            canvas.drawRect(f9 + sin, f8 - f, f2 + f7 + sin, f8 + (0.5f * f), this.p);
+        float u = this.bgS;
+        if (this.W <= 0 || this.H <= 0 || !(u > 0f)) return;
+        int bi = biome();
+        float t = this.time;
+        float W = this.W;
+        float base = this.groundY + 2.2f * u;
+        Paint q = this.bgP;
+        int o = bi * 5;
+        int cBase = bgGrassCol[o];
+        int cStem = bgGrassCol[o + 1];
+        int cUp = bgGrassCol[o + 2];
+        int cTip = bgGrassCol[o + 3];
+        int cSil = bgGrassCol[o + 4];
+        // biome props tucked into the grass (flowers / crystals / brambles)
+        for (int d = 0; d < bgDecoX.length; d++) {
+            float x = (float) Math.floor(bgDecoX[d] * W / u) * u;
+            if (bi == 0) {
+                int col = bgFlowerCol[d % 3];
+                float sw = bgWind(x, t, d * 5 + 3) * u * 0.6f;
+                float sh = (3f + d % 2) * u;
+                float hx = x + sw;
+                float hy = base - sh - u;
+                bgGlow(canvas, hx + u * 0.5f, hy + u * 0.5f, u * 2.6f, col, 26f + 22f * bgSin(t * 1.2f + d * 1.9f));
+                q.setColor(cStem);
+                q.setAlpha(255);
+                canvas.drawRect(x, base - sh * 0.5f, x + u, base, q);
+                canvas.drawRect(x + sw * 0.5f, base - sh, x + u + sw * 0.5f, base - sh * 0.5f, q);
+                q.setColor(col);
+                canvas.drawRect(hx - u, hy, hx, hy + u, q);
+                canvas.drawRect(hx + u, hy, hx + 2f * u, hy + u, q);
+                canvas.drawRect(hx, hy - u, hx + u, hy, q);
+                canvas.drawRect(hx, hy + u, hx + u, hy + 2f * u, q);
+                q.setColor(0xFFFFF0A0);
+                canvas.drawRect(hx, hy, hx + u, hy + u, q);
+            } else if (bi == 1) {
+                int col = bgMoteCol[d % 4];
+                float h = (3f + d % 3) * u;
+                float f = 0.5f + 0.5f * bgSin(t * 1.7f + d * 2.3f);
+                bgGlow(canvas, x + u, base - h * 0.6f, u * 3.4f, col, 34f + 40f * f);
+                q.setColor(bgShade(col, 0.6f));
+                q.setAlpha(255);
+                canvas.drawRect(x + 2f * u, base - h * 0.5f, x + 3f * u, base, q);
+                canvas.drawRect(x - u, base - h * 0.35f, x, base, q);
+                q.setColor(col);
+                canvas.drawRect(x, base - h, x + 2f * u, base, q);
+                canvas.drawRect(x + u, base - h - u, x + 2f * u, base - h, q);
+                q.setColor(0xFFE8FCFF);
+                q.setAlpha(200);
+                canvas.drawRect(x, base - h + u, x + u, base - u, q);
+                if (f > 0.9f) bgSparkle(canvas, x + u, base - h - 2f * u, u * 0.7f, 0xFFFFFFFF, bgAl((f - 0.9f) * 10f * 230f));
+            } else {
+                float sw = bgWind(x, t, d * 5 + 3) * u * 0.35f;
+                q.setColor(cSil);
+                q.setAlpha(255);
+                canvas.drawRect(x, base - 2f * u, x + u, base, q);
+                canvas.drawRect(x + u + sw * 0.4f, base - 4f * u, x + 2f * u + sw * 0.4f, base - 2f * u, q);
+                canvas.drawRect(x + sw, base - 6f * u, x + u + sw, base - 4f * u, q);
+                canvas.drawRect(x - u, base - 3f * u, x, base - 2f * u, q);
+                canvas.drawRect(x + 2f * u + sw * 0.6f, base - 5f * u, x + 3f * u + sw * 0.6f, base - 4f * u, q);
+                float f = 0.6f + 0.25f * bgSin(t * 5.3f + d * 2.9f) + 0.15f * bgSin(t * 13.1f + d);
+                bgGlow(canvas, x + sw + u * 0.5f, base - 6.5f * u, u * 2.2f, 0xFFFF6A3A, 90f * f);
+                bgPixel(canvas, x + sw, base - 7f * u, u, 0xFFFFB23E, bgAl(255f * f));
+            }
+        }
+        // swaying blades: staircase bend, darker roots, moon-lit tips
+        int n = 26;
+        float fz = this.bgFz;
+        for (int i = 0; i < n; i++) {
+            float x = (i + 0.5f) * W / n + (((i * 37) % 7) - 3) * u * 0.7f;
+            int segs = 3 + (i * 5) % 4;
+            float sway = bgWind(x, t, i) * u;
+            for (int s = 0; s < segs; s++) {
+                float k = (s + 1f) / segs;
+                float off = sway * k * k;
+                q.setColor(s == segs - 1 ? cTip : s == 0 ? cBase : s >= segs - 2 ? cUp : cStem);
+                q.setAlpha(255);
+                canvas.drawRect(x - u + off, base - (s + 1) * u, x + off, base - s * u, q);
+            }
+            if (fz > 0.01f) {
+                q.setColor(0xFFFFD35A);
+                q.setAlpha(bgAl(255f * fz * (0.55f + 0.45f * bgSin(t * 8f + i))));
+                canvas.drawRect(x - u + sway, base - segs * u, x + sway, base - (segs - 1) * u, q);
+            }
+            if (i % 2 == 0) {
+                // shorter companion blade leaning the other way
+                int s2 = segs - 1;
+                for (int s = 0; s < s2; s++) {
+                    float k = (s + 1f) / s2;
+                    float off = (sway * 0.6f + u * 0.8f) * k * k;
+                    q.setColor(s == s2 - 1 ? cUp : cStem);
+                    q.setAlpha(255);
+                    canvas.drawRect(x + off, base - (s + 1) * u, x + u + off, base - s * u, q);
+                }
+            }
+        }
+        // dark foreground tufts framing both edges for depth
+        for (int side = 0; side < 2; side++) {
+            float dir = side == 0 ? -1f : 1f;
+            for (int j = 0; j < 3; j++) {
+                float x = side == 0 ? (0.5f + j * 1.7f) * u : W - (1.5f + j * 1.7f) * u;
+                int segs = 6 + (j * 3 + side) % 4;
+                float sway = bgWind(x, t, 40 + j + side * 3) * u * 0.8f + dir * (2.4f - j * 0.7f) * u;
+                q.setColor(cSil);
+                q.setAlpha(255);
+                for (int s = 0; s < segs; s++) {
+                    float k = (s + 1f) / segs;
+                    float off = sway * k * k;
+                    canvas.drawRect(x - u + off, base + u - (s + 1) * u, x + off + (s < 2 ? u : 0f), base + u - s * u, q);
+                }
+            }
         }
     }
 
@@ -5592,18 +6458,50 @@ public class GameView extends View implements Runnable {
     }
 
     void drawVignette(Canvas canvas) {
-        float f = this.vigW;
-        int i = this.W;
-        if (f != i || this.vigT != this.battleT) {
-            this.vigW = i;
-            float f2 = this.battleT;
-            this.vigT = f2;
-            float f3 = (f2 + this.battleB) / 2.0f;
-            Paint paint = this.vigP;
-            int i2 = this.W;
-            paint.setShader(new RadialGradient(i2 / 2.0f, f3, Math.max(i2, this.battleB - this.battleT) * 0.78f, new int[]{OV_NONE, OV_NONE, 1996488704}, new float[]{0.0f, 0.62f, 1.0f}, Shader.TileMode.CLAMP));
+        float T = this.battleT;
+        float B = this.battleB;
+        if (this.W <= 0 || this.H <= 0 || !(B > T)) return;
+        int bi = biome();
+        float W = this.W;
+        if (this.bgVKeyBi != bi || this.bgVKeyW != W || this.bgVKeyT != T || this.bgVKeyB != B) {
+            this.bgVKeyBi = bi;
+            this.bgVKeyW = W;
+            this.bgVKeyT = T;
+            this.bgVKeyB = B;
+            float cx = W / 2f;
+            float cy = (T + B) / 2f;
+            float rad = Math.max(W, B - T) * 0.78f;
+            Shader.TileMode cl = Shader.TileMode.CLAMP;
+            int ec = bgEdgeCol[bi];
+            this.bgVigP.setShader(new RadialGradient(cx, cy, rad,
+                    new int[]{bgA(ec, 0), bgA(ec, 0), bgA(ec, 0x48), bgA(ec, 0xA8)},
+                    new float[]{0f, 0.5f, 0.8f, 1f}, cl));
+            float eh = Math.max(1f, Math.min(this.pad * 4f, (B - T) * 0.25f));
+            this.bgTopP.setShader(new android.graphics.LinearGradient(0f, T, 0f, T + eh,
+                    new int[]{0x66000000, 0x1A000000, 0}, new float[]{0f, 0.35f, 1f}, cl));
+            this.bgBotP.setShader(new android.graphics.LinearGradient(0f, B - eh, 0f, B,
+                    0, 0x55000000, cl));
+            this.bgFzP.setShader(new RadialGradient(cx, cy, rad,
+                    new int[]{0x00FFC040, 0x00FFC040, 0x80FFB030, 0xE8FF5020},
+                    new float[]{0f, 0.42f, 0.74f, 1f}, cl));
+            this.bgBossP.setShader(new RadialGradient(cx, cy, rad,
+                    new int[]{0x00600010, 0x00600010, 0x80600010, 0xF02A0006},
+                    new float[]{0f, 0.42f, 0.8f, 1f}, cl));
         }
-        canvas.drawRect(0.0f, this.battleT, this.W, this.battleB, this.vigP);
+        float eh = Math.max(1f, Math.min(this.pad * 4f, (B - T) * 0.25f));
+        canvas.drawRect(0f, T, W, B, this.bgVigP);
+        canvas.drawRect(0f, T, W, T + eh, this.bgTopP);
+        canvas.drawRect(0f, B - eh, W, B, this.bgBotP);
+        float t = this.time;
+        if (this.bgFz > 0.01f) {
+            float pul = 0.55f + 0.25f * bgSin(t * 7f) + 0.2f * this.beatPulse;
+            this.bgFzP.setAlpha(bgAl(255f * this.bgFz * pul));
+            canvas.drawRect(0f, T, W, B, this.bgFzP);
+        }
+        if (this.bgBossA > 0.01f) {
+            this.bgBossP.setAlpha(bgAl(255f * this.bgBossA * (0.45f + 0.55f * this.bgBeat)));
+            canvas.drawRect(0f, T, W, B, this.bgBossP);
+        }
     }
 
     void dropRelic() {
