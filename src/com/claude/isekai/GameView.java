@@ -621,7 +621,7 @@ public class GameView extends View implements Runnable {
 
     static String fmt(double d) {
         double d2 = d;
-        if (d2 < 1000.0d) {
+        if (Double.isNaN(d2) || d2 < 1000.0d) {
             return (d2 >= 10.0d || d2 == Math.floor(d)) ? String.valueOf((long) d2) : String.format("%.1f", Double.valueOf(d));
         }
         String[] strArr = {"K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"};
@@ -6864,6 +6864,11 @@ public class GameView extends View implements Runnable {
         save();
     }
 
+    public void releaseAudio() {
+        pauseGame();
+        this.sfx.release();
+    }
+
     int pendingCompStory() {
         for (int i = 1; i < 5; i++) {
             if (compUnlocked(i)) {
@@ -7341,16 +7346,17 @@ public class GameView extends View implements Runnable {
         switch (i2) {
             case OV_NONE /* 0 */:
                 this.optMusic = !this.optMusic;
+                applySound();
                 break;
             case 1:
                 this.optSfx = !this.optSfx;
+                applySound();
                 break;
             case 2:
-                boolean z = !this.optVib;
-                this.optVib = z;
-                if (z) {
+                this.optVib = !this.optVib;
+                applySound();
+                if (this.optVib) {
                     this.sfx.buzz(60L);
-                    break;
                 }
                 break;
             case 3:

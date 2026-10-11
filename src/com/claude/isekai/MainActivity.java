@@ -27,4 +27,10 @@ public class MainActivity extends Activity {
         super.onResume();
         this.game.resume();
     }
+
+    @Override // android.app.Activity
+    protected void onDestroy() {
+        super.onDestroy();
+        this.game.releaseAudio();
+    }
 }
