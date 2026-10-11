@@ -4525,240 +4525,790 @@ public class GameView extends View implements Runnable {
         }
     }
 
-    /* JADX WARN: Removed duplicated region for block: B:14:0x0084  */
-    /* JADX WARN: Removed duplicated region for block: B:28:0x0124  */
-    /* JADX WARN: Removed duplicated region for block: B:31:0x016b  */
-    /* JADX WARN: Removed duplicated region for block: B:45:0x01c9  */
-    /* JADX WARN: Removed duplicated region for block: B:48:0x01fc  */
-    /* JADX WARN: Removed duplicated region for block: B:51:0x0258  */
-    /* JADX WARN: Removed duplicated region for block: B:54:0x02cb  */
-    /* JADX WARN: Removed duplicated region for block: B:71:? A[RETURN, SYNTHETIC] */
-    /* JADX WARN: Removed duplicated region for block: B:72:0x025f  */
-    /* JADX WARN: Removed duplicated region for block: B:73:0x0200  */
-    /* JADX WARN: Removed duplicated region for block: B:77:0x01cc  */
-    /* JADX WARN: Removed duplicated region for block: B:78:0x016e  */
-    /* JADX WARN: Removed duplicated region for block: B:79:0x0136  */
-    /* JADX WARN: Removed duplicated region for block: B:80:0x0116  */
-    /*
-        Code decompiled incorrectly, please refer to instructions dump.
-        To view partially-correct add '--show-bad-code' argument
-    */
+    // ===== gfx(mon): monster & boss rendering — every member below is prefixed "mon" =====
+    // idle styles: 0 breathe, 1 hopper, 2 flyer, 3 heavy brute, 4 rattling bones, 5 engine rumble
+    static final int[] monMobKind = {1, 1, 0, 4, 2, 3, 3, 3, 2, 2};
+    static final int[] monBossKind = {1, 3, 3, 2, 3, 3, 2, 3, 3, 5};
+    static final float[] monGlowStops = {0.0f, 0.42f, 1.0f};
+    static final int[] monWsCols = {0xB4FFEC8A, 0x52FFB000, 0x00FF8000};
+    static final float[] monGlintX = {-0.3f, 0.32f, 0.04f};
+    static final float[] monGlintY = {0.7f, 0.42f, 0.97f};
+    final int[] monGlowCols = new int[3];
+    final Paint monFillP = monMk(false);
+    final Paint monLineP = monMk(true);
+    final Paint monGlowP = monMk(false);
+    final Paint monWsGlowP = monMk(false);
+    final Paint monWhiteP = monMkSil(0xFFFFFFFF);
+    final Paint monRedP = monMkSil(0xFFFF2A3A);
+    final Paint monRimBossP = monMkSil(0xFFFF4D6D);
+    final Paint monRimTowerP = monMkSil(0xFFFFA040);
+    final Paint monRimGoldP = monMkSil(0xFFFFD35A);
+    final RectF monRect = new RectF();
+    final Path monPath = new Path();
+    final Random monRnd = new Random();
+    int monGlowR = -1;
+    int monGlowC;
+    int monWsR = -1;
+    float monPrevSpawn = 1.0f;
+    long monSpawnAt = -100000L;
+    float monHpTrail = 1.0f;
+    long monHpMs;
+    String monWsStr = "";
+    int monWsStrN = -1;
+    Bitmap monDrawnBmp;
+    float monDrawnX;
+    float monDrawnB;
+    float monDrawnS;
+    float monDrawnSx = 1.0f;
+    float monDrawnSy = 1.0f;
+    Bitmap monDeadBmp;
+    float monDeadX;
+    float monDeadB;
+    float monDeadS;
+    float monDeadSx = 1.0f;
+    float monDeadSy = 1.0f;
+    long monDeadAt = -100000L;
+    int monDeadCol = -1;
+    boolean monDeadBoss;
+
+    static Paint monMk(boolean stroke) {
+        Paint pt = new Paint(Paint.ANTI_ALIAS_FLAG);
+        pt.setStyle(stroke ? Paint.Style.STROKE : Paint.Style.FILL);
+        return pt;
+    }
+
+    // crisp single-colour silhouette of a sprite (outline, flash, tint)
+    static Paint monMkSil(int color) {
+        Paint pt = new Paint();
+        pt.setFilterBitmap(false);
+        pt.setAntiAlias(false);
+        pt.setDither(false);
+        pt.setColorFilter(new PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN));
+        return pt;
+    }
+
+    static float monClamp(float v) {
+        if (!(v > 0.0f)) {
+            return 0.0f;
+        }
+        return v > 1.0f ? 1.0f : v;
+    }
+
+    static int monA(float a) {
+        return (int) (monClamp(a) * 255.0f);
+    }
+
+    static int monShade(int c, float f) {
+        int r = Math.min(255, (int) (((c >> 16) & 255) * f));
+        int g = Math.min(255, (int) (((c >> 8) & 255) * f));
+        int b = Math.min(255, (int) ((c & 255) * f));
+        return (c & 0xFF000000) | (r << 16) | (g << 8) | b;
+    }
+
+    static int monLerpC(int a, int b, float t) {
+        t = monClamp(t);
+        int aa = (int) (((a >>> 24) & 255) + ((((b >>> 24) & 255) - ((a >>> 24) & 255)) * t));
+        int ar = (int) (((a >> 16) & 255) + ((((b >> 16) & 255) - ((a >> 16) & 255)) * t));
+        int ag = (int) (((a >> 8) & 255) + ((((b >> 8) & 255) - ((a >> 8) & 255)) * t));
+        int ab = (int) ((a & 255) + (((b & 255) - (a & 255)) * t));
+        return (aa << 24) | (ar << 16) | (ag << 8) | ab;
+    }
+
+    // elastic (ease-out-back) pop-in, same 0.3 -> 1.0 range as the old linear spawn scale
+    float monSpawnK() {
+        float q = monClamp(this.mobSpawn) - 1.0f;
+        return 0.3f + 0.7f * (1.0f + 2.9f * q * q * q + 1.9f * q * q);
+    }
+
+    int monKind(Bitmap b) {
+        if (b.getWidth() > 24) {
+            return 5;
+        }
+        for (int i = 0; i < this.bmBoss.length && i < monBossKind.length; i++) {
+            if (this.bmBoss[i] == b) {
+                return monBossKind[i];
+            }
+        }
+        if (b == this.bmMimic) {
+            return 1;
+        }
+        for (int i = 0; i < this.bmMob.length && i < monMobKind.length; i++) {
+            if (this.bmMob[i] == b) {
+                return monMobKind[i];
+            }
+        }
+        return 0;
+    }
+
+    void monEnsureGlow(int rad, int col) {
+        rad = Math.max(1, rad);
+        if (rad == this.monGlowR && col == this.monGlowC && this.monGlowP.getShader() != null) {
+            return;
+        }
+        this.monGlowR = rad;
+        this.monGlowC = col;
+        int rgb = col & 0xFFFFFF;
+        this.monGlowCols[0] = 0xB4000000 | rgb;
+        this.monGlowCols[1] = 0x5C000000 | rgb;
+        this.monGlowCols[2] = rgb;
+        this.monGlowP.setShader(new RadialGradient(0.0f, 0.0f, rad, this.monGlowCols, monGlowStops, Shader.TileMode.CLAMP));
+    }
+
+    void monGlow(Canvas c, float cx, float cy, float sx, float sy, int alpha) {
+        if (alpha <= 0 || this.monGlowR <= 0) {
+            return;
+        }
+        this.monGlowP.setAlpha(alpha);
+        c.save();
+        c.translate(cx, cy);
+        c.scale(sx, sy);
+        c.drawCircle(0.0f, 0.0f, this.monGlowR, this.monGlowP);
+        c.restore();
+    }
+
+    // perspective summoning circle on the ground; back half is drawn behind the boss, front half over its feet
+    void monDrawRing(Canvas c, boolean front, int col, float cx, float gy, float rx, float ry, float a) {
+        if (a <= 0.01f || rx <= 0.0f) {
+            return;
+        }
+        float rot = (this.time * 32.0f) % 360.0f;
+        int lite = monShade(col, 1.45f);
+        this.monLineP.setColor(col);
+        this.monLineP.setStrokeWidth(this.hu * 0.5f);
+        this.monLineP.setAlpha(monA(a * (front ? 0.62f : 0.36f)));
+        this.monRect.set(cx - rx, gy - ry, cx + rx, gy + ry);
+        c.drawArc(this.monRect, front ? 0.0f : 180.0f, 180.0f, false, this.monLineP);
+        float ox = rx * 1.16f;
+        float oy = ry * 1.16f;
+        this.monRect.set(cx - ox, gy - oy, cx + ox, gy + oy);
+        this.monLineP.setColor(lite);
+        this.monLineP.setStrokeWidth(this.hu * 0.8f);
+        this.monLineP.setAlpha(monA(a * (front ? 0.85f : 0.45f)));
+        for (int i = 0; i < 12; i++) {
+            float st = rot + (i * 30.0f);
+            if ((((st + 8.0f) % 360.0f) < 180.0f) == front) {
+                c.drawArc(this.monRect, st, 16.0f, false, this.monLineP);
+            }
+        }
+        float ix = rx * 0.74f;
+        float iy = ry * 0.74f;
+        this.monRect.set(cx - ix, gy - iy, cx + ix, gy + iy);
+        this.monLineP.setColor(col);
+        this.monLineP.setStrokeWidth(this.hu * 0.45f);
+        this.monLineP.setAlpha(monA(a * (front ? 0.7f : 0.4f)));
+        float rot2 = 360.0f - ((rot * 1.5f) % 360.0f);
+        for (int i = 0; i < 6; i++) {
+            float st = (rot2 + (i * 60.0f)) % 360.0f;
+            if ((((st + 17.0f) % 360.0f) < 180.0f) == front) {
+                c.drawArc(this.monRect, st, 34.0f, false, this.monLineP);
+            }
+        }
+        float g = this.hu * 0.5f;
+        this.monFillP.setColor(lite);
+        for (int i = 0; i < 8; i++) {
+            double ang = Math.toRadians((rot * 0.7f) + (i * 45.0f));
+            float sn = (float) Math.sin(ang);
+            if ((sn > 0.0f) != front) {
+                continue;
+            }
+            float gx = cx + ((float) Math.cos(ang) * rx);
+            float gyy = ((gy + (sn * ry)) - (g * 4.0f)) + ((float) Math.sin((this.time * 3.0f) + i) * g);
+            float tw = 0.55f + (0.45f * (float) Math.sin((this.time * 4.0f) + (i * 1.7f)));
+            this.monFillP.setAlpha(monA(a * tw * (front ? 0.95f : 0.5f)));
+            int shape = i % 3;
+            if (shape == 0) {
+                c.drawRect(gx - (g * 1.5f), gyy - (g * 1.5f), gx + (g * 1.5f), gyy - (g * 0.5f), this.monFillP);
+                c.drawRect(gx - (g * 0.5f), gyy - (g * 0.5f), gx + (g * 0.5f), gyy + (g * 1.5f), this.monFillP);
+            } else if (shape == 1) {
+                c.drawRect(gx - (g * 0.5f), gyy - (g * 1.5f), gx + (g * 0.5f), gyy + (g * 1.5f), this.monFillP);
+                c.drawRect(gx - (g * 1.5f), gyy - (g * 0.5f), gx + (g * 1.5f), gyy + (g * 0.5f), this.monFillP);
+            } else {
+                c.drawRect(gx - (g * 1.5f), gyy - (g * 1.5f), gx - (g * 0.5f), gyy + (g * 1.5f), this.monFillP);
+                c.drawRect(gx - (g * 0.5f), gyy + (g * 0.5f), gx + (g * 1.5f), gyy + (g * 1.5f), this.monFillP);
+                c.drawRect(gx + (g * 0.5f), gyy - (g * 1.5f), gx + (g * 1.5f), gyy - (g * 0.5f), this.monFillP);
+            }
+        }
+    }
+
+    // boss entrance: speed streaks + landing reticle while falling, double shockwave after touchdown
+    void monDrawIntroFx(Canvas c, float px, float bottom, float sprW, float sprH, int col) {
+        float it = this.bossIntroT;
+        if (it > 1.0f) {
+            float q = monClamp(1.0f - ((1.6f - it) / 0.6f));
+            float top = bottom - sprH;
+            this.monLineP.setStrokeWidth(this.hu * 0.7f);
+            for (int i = 0; i < 6; i++) {
+                float lx = px + ((i - 2.5f) * sprW * 0.17f);
+                float len = this.mobR * (0.9f + (0.5f * (i % 3))) * (0.4f + q);
+                float off = this.mobR * 0.15f * (i % 2);
+                this.monLineP.setColor(i % 2 == 0 ? -1 : monShade(col, 1.3f));
+                this.monLineP.setAlpha(monA(0.65f - (0.2f * q)));
+                c.drawLine(lx, top - off, lx, (top - off) - len, this.monLineP);
+            }
+            float tr = this.mobR * (0.6f + (1.4f * q));
+            this.monRect.set(this.mobX - tr, this.groundY - (tr * 0.28f), this.mobX + tr, this.groundY + (tr * 0.28f));
+            this.monLineP.setColor(col);
+            this.monLineP.setStrokeWidth(this.hu * 0.6f);
+            this.monLineP.setAlpha(monA(0.5f + (0.4f * (float) Math.sin(this.time * 20.0f))));
+            c.drawOval(this.monRect, this.monLineP);
+        } else if (it > 0.4f) {
+            float k = monClamp((1.0f - it) / 0.6f);
+            float e = 1.0f - ((1.0f - k) * (1.0f - k));
+            for (int j = 0; j < 2; j++) {
+                float kk = Math.max(0.0f, e - (j * 0.18f));
+                float rx = this.mobR * (0.5f + (2.6f * kk));
+                this.monRect.set(this.mobX - rx, this.groundY - (rx * 0.28f), this.mobX + rx, this.groundY + (rx * 0.28f));
+                this.monLineP.setStrokeWidth(Math.max(1.0f, this.pad * 0.9f * (1.0f - k)));
+                this.monLineP.setColor(j == 0 ? 0xFFFFEBC8 : col);
+                this.monLineP.setAlpha(monA((1.0f - k) * 0.85f));
+                c.drawOval(this.monRect, this.monLineP);
+            }
+        }
+    }
+
+    // summon pillar, ground ring and dust puffs when a new monster pops in
+    void monDrawSpawnFx(Canvas c, long now, boolean boss) {
+        float k = (now - this.monSpawnAt) / 500.0f;
+        if (k < 0.0f || k >= 1.0f || (boss && this.bossIntroT > 0.0f)) {
+            return;
+        }
+        float inv = 1.0f - k;
+        float e = 1.0f - (inv * inv);
+        float gx = this.mobX;
+        float gy = this.groundY;
+        float pw = this.mobR * 0.85f * inv;
+        float top = gy - (this.mobR * 2.7f);
+        this.monFillP.setColor(0xFFFFF6E0);
+        this.monFillP.setAlpha(monA(inv * inv * 0.4f));
+        c.drawRect(gx - pw, top, gx + pw, gy, this.monFillP);
+        this.monFillP.setAlpha(monA(inv * inv * 0.7f));
+        c.drawRect(gx - (pw * 0.35f), top, gx + (pw * 0.35f), gy, this.monFillP);
+        float rx = this.mobR * (0.35f + (1.5f * e));
+        this.monRect.set(gx - rx, gy - (rx * 0.28f), gx + rx, gy + (rx * 0.28f));
+        this.monLineP.setStrokeWidth(Math.max(1.0f, this.pad * 0.5f * inv));
+        this.monLineP.setColor(monShade(mobColor(), 1.3f));
+        this.monLineP.setAlpha(monA(inv * 0.8f));
+        c.drawOval(this.monRect, this.monLineP);
+        this.monFillP.setColor(0xFFE9E2D2);
+        this.monFillP.setAlpha(monA(inv * 0.85f));
+        float d = this.mobR * (0.3f + (1.15f * e));
+        for (int i = 0; i < 10; i++) {
+            double a = Math.toRadians((i * 36.0f) + 12.0f);
+            float x = gx + ((float) Math.cos(a) * d);
+            float y = ((gy - (this.hu * 1.2f)) + ((float) Math.sin(a) * d * 0.3f)) - (e * this.mobR * 0.12f * (i % 3));
+            float sz = this.hu * (1.7f - (1.1f * k)) * (i % 2 == 0 ? 1.0f : 0.7f);
+            c.drawRect(x - sz, y - sz, x + sz, y + sz, this.monFillP);
+        }
+    }
+
+    // death: white ghost expanding out of the shattered sprite, flash, ground shockwave (+ light rays for bosses)
+    void monDrawGhost(Canvas c, long now) {
+        Bitmap b = this.monDeadBmp;
+        if (b == null) {
+            return;
+        }
+        float k = (now - this.monDeadAt) / (this.monDeadBoss ? 850.0f : 480.0f);
+        if (k < 0.0f || k >= 1.0f) {
+            return;
+        }
+        float inv = 1.0f - k;
+        float e = 1.0f - (inv * inv);
+        float cy = this.monDeadB - (b.getHeight() * this.monDeadS * this.monDeadSy * 0.5f);
+        this.monFillP.setColor(-1);
+        this.monFillP.setAlpha(monA(inv * inv * inv * 0.5f));
+        c.drawCircle(this.monDeadX, cy, this.mobR * (0.5f + (1.2f * e)), this.monFillP);
+        float gs = this.monDeadS * (1.0f + (0.7f * e));
+        this.monWhiteP.setAlpha(monA(inv * inv * inv * 0.7f));
+        blit(c, b, this.monDeadX, cy + (b.getHeight() * gs * this.monDeadSy * 0.5f), gs, this.monDeadSx, this.monDeadSy, this.monWhiteP);
+        float rx = this.mobR * (0.4f + ((this.monDeadBoss ? 2.8f : 2.0f) * e));
+        this.monRect.set(this.monDeadX - rx, this.groundY - (rx * 0.28f), this.monDeadX + rx, this.groundY + (rx * 0.28f));
+        this.monLineP.setStrokeWidth(Math.max(1.0f, this.pad * 0.8f * inv));
+        this.monLineP.setColor(monShade(this.monDeadCol, 1.25f));
+        this.monLineP.setAlpha(monA(inv * 0.9f));
+        c.drawOval(this.monRect, this.monLineP);
+        if (this.monDeadBoss) {
+            this.monLineP.setColor(0xFFFFF2C0);
+            this.monLineP.setStrokeWidth(Math.max(1.0f, this.hu * 1.4f * inv));
+            this.monLineP.setAlpha(monA(inv * 0.8f));
+            for (int i = 0; i < 10; i++) {
+                double a = Math.toRadians((i * 36.0f) + 9.0f + (k * 20.0f));
+                float ca = (float) Math.cos(a);
+                float sa = (float) Math.sin(a);
+                float r0 = this.mobR * (0.35f + (1.3f * e));
+                float r1 = r0 + (this.mobR * (0.4f + inv) * (i % 2 == 0 ? 1.0f : 0.6f));
+                c.drawLine(this.monDeadX + (ca * r0), cy + (sa * r0), this.monDeadX + (ca * r1), cy + (sa * r1), this.monLineP);
+            }
+        }
+    }
+
+    // twinkling treasure glints on the mimic
+    void monDrawGlints(Canvas c, float px, float bottom, float w, float h) {
+        for (int i = 0; i < 3; i++) {
+            float ph = ((this.time * 0.7f) + (i * 0.37f)) % 1.0f;
+            if (ph > 0.3f) {
+                continue;
+            }
+            float q = (float) Math.sin((ph / 0.3f) * Math.PI);
+            float gx = px + (w * monGlintX[i]);
+            float gy = bottom - (h * monGlintY[i]);
+            float len = (this.hu * 2.4f * q) + (this.hu * 0.3f);
+            float th = this.hu * 0.4f;
+            this.monFillP.setColor(0xFFFFF3B8);
+            this.monFillP.setAlpha(monA(q));
+            c.drawRect(gx - len, gy - th, gx + len, gy + th, this.monFillP);
+            c.drawRect(gx - th, gy - len, gx + th, gy + len, this.monFillP);
+            this.monFillP.setColor(-1);
+            this.monFillP.setAlpha(monA(q));
+            c.drawRect(gx - (th * 1.5f), gy - (th * 1.5f), gx + (th * 1.5f), gy + (th * 1.5f), this.monFillP);
+        }
+    }
+
+    // Truck-kun's headlight: stepped light cone aimed at the hero (front=false) and a lens flare (front=true)
+    void monDrawBeam(Canvas c, boolean front, float px, float bottom, float cw, float ch, Bitmap b) {
+        float hx = (px - (b.getWidth() * cw * 0.5f)) + (2.0f * cw);
+        float hy = bottom - ((b.getHeight() - 11.0f) * ch);
+        float fl = 0.85f + (0.15f * (float) Math.sin(this.time * 23.0f));
+        if (front) {
+            this.monFillP.setColor(0xFFFFF6C8);
+            this.monFillP.setAlpha(monA(0.3f * fl));
+            c.drawCircle(hx - (cw * 0.5f), hy, ch * 1.7f, this.monFillP);
+            this.monFillP.setAlpha(monA(0.55f * fl));
+            c.drawCircle(hx - (cw * 0.5f), hy, ch * 0.9f, this.monFillP);
+            return;
+        }
+        float len = this.mobR * 2.4f;
+        float spread = this.mobR * 0.42f;
+        this.monFillP.setColor(0xFFFFE45A);
+        for (int i = 0; i < 3; i++) {
+            float k = 1.0f - (i * 0.3f);
+            this.monFillP.setAlpha(monA((0.1f + (i * 0.05f)) * fl));
+            this.monPath.reset();
+            this.monPath.moveTo(hx, hy - (ch * 0.6f));
+            this.monPath.lineTo(hx - (len * k), hy - (spread * k * 0.7f));
+            this.monPath.lineTo(hx - (len * k), hy + (spread * k));
+            this.monPath.lineTo(hx, hy + (ch * 0.6f));
+            this.monPath.close();
+            c.drawPath(this.monPath, this.monFillP);
+        }
+    }
+
+    // bevel, segment ticks, gloss sweep and edge glint over a filled bar (clipped to the fill)
+    void monBarGloss(Canvas c, float l, float tp0, float fillR, float barW, float barH, boolean boss) {
+        if (fillR <= l + this.pad) {
+            return;
+        }
+        c.save();
+        c.clipRect(l, tp0, fillR, tp0 + barH);
+        this.monFillP.setColor(-1);
+        this.monFillP.setAlpha(80);
+        c.drawRect(l + (this.pad * 0.5f), tp0 + (barH * 0.16f), fillR - (this.pad * 0.5f), tp0 + (barH * 0.38f), this.monFillP);
+        this.monFillP.setColor(-16777216);
+        this.monFillP.setAlpha(60);
+        c.drawRect(l, tp0 + (barH * 0.72f), fillR, tp0 + barH, this.monFillP);
+        this.monFillP.setAlpha(70);
+        float tw = Math.max(1.0f, this.hu * 0.22f);
+        for (int i = 1; i < 10; i++) {
+            float x = l + ((barW * i) / 10.0f);
+            if (x >= fillR) {
+                break;
+            }
+            c.drawRect(x - tw, tp0, x + tw, tp0 + barH, this.monFillP);
+        }
+        float sw = ((this.time * 0.5f) % 1.6f) - 0.3f;
+        float gx = l + (sw * barW);
+        this.monFillP.setColor(-1);
+        this.monFillP.setAlpha(boss ? 95 : 60);
+        c.drawRect(gx - (this.pad * 0.6f), tp0, gx + (this.pad * 0.6f), tp0 + barH, this.monFillP);
+        this.monFillP.setAlpha(boss ? 50 : 30);
+        c.drawRect(gx + (this.pad * 0.9f), tp0, gx + (this.pad * 1.2f), tp0 + barH, this.monFillP);
+        c.restore();
+        this.monFillP.setColor(-1);
+        this.monFillP.setAlpha(monA(0.5f + (0.4f * (float) Math.sin(this.time * 6.0f))));
+        c.drawRect(fillR - (this.pad * 0.6f), tp0 + (barH * 0.22f), fillR - (this.pad * 0.36f), tp0 + (barH * 0.78f), this.monFillP);
+    }
+
+    void monEnsureWsGlow(int rad) {
+        rad = Math.max(1, rad);
+        if (rad == this.monWsR && this.monWsGlowP.getShader() != null) {
+            return;
+        }
+        this.monWsR = rad;
+        this.monWsGlowP.setShader(new RadialGradient(0.0f, 0.0f, rad, monWsCols, monGlowStops, Shader.TileMode.CLAMP));
+    }
+
+    // weak-spot target: halo, countdown arc, closing ring, spinning crosshair, lock-on ticks, core
+    void monDrawWeak(Canvas c, float cx, float cy, float base, float pulse, float k, long now) {
+        k = monClamp(k);
+        float age = Math.max(0.0f, (this.wsLife - (this.wsUntil - now)) / 1000.0f);
+        float intro = monClamp(age / 0.22f);
+        float zoom = 1.0f + ((1.0f - intro) * (1.0f - intro) * 1.8f);
+        boolean urgent = k < 0.3f;
+        float blink = urgent ? 0.55f + (0.45f * (float) Math.sin(this.time * 32.0f)) : 1.0f;
+        int warm = monLerpC(0xFFFF4A4A, -10496, k);
+        this.monEnsureWsGlow((int) (base * 3.0f));
+        this.monWsGlowP.setAlpha(monA(intro * (0.55f + (0.25f * (float) Math.sin(this.time * 8.0f))) * (urgent ? 0.6f + (0.4f * blink) : 1.0f)));
+        c.save();
+        c.translate(cx, cy);
+        c.drawCircle(0.0f, 0.0f, this.monWsR, this.monWsGlowP);
+        c.restore();
+        this.monFillP.setColor(-16777216);
+        this.monFillP.setAlpha(monA(intro * 0.45f));
+        c.drawCircle(cx, cy, base * 1.2f, this.monFillP);
+        float ar = base * 1.6f;
+        this.monRect.set(cx - ar, cy - ar, cx + ar, cy + ar);
+        this.monLineP.setStrokeWidth(this.pad * 0.55f);
+        this.monLineP.setColor(-16777216);
+        this.monLineP.setAlpha(monA(intro * 0.5f));
+        c.drawOval(this.monRect, this.monLineP);
+        this.monLineP.setColor(warm);
+        this.monLineP.setAlpha(monA(intro * blink));
+        c.drawArc(this.monRect, -90.0f, 360.0f * k, false, this.monLineP);
+        double ha = Math.toRadians((360.0f * k) - 90.0f);
+        this.monFillP.setColor(-1);
+        this.monFillP.setAlpha(monA(intro * blink));
+        c.drawCircle(cx + ((float) Math.cos(ha) * ar), cy + ((float) Math.sin(ha) * ar), this.pad * 0.42f, this.monFillP);
+        this.monLineP.setStrokeWidth(this.pad * 0.3f);
+        this.monLineP.setColor(-42406);
+        this.monLineP.setAlpha(monA(intro * (0.35f + (0.65f * (1.0f - k)))));
+        c.drawCircle(cx, cy, base * ((2.2f * k) + 1.0f), this.monLineP);
+        float cr = base * pulse * zoom * 0.95f;
+        this.monRect.set(cx - cr, cy - cr, cx + cr, cy + cr);
+        this.monLineP.setStrokeWidth(this.pad * 0.45f);
+        this.monLineP.setColor(-10496);
+        this.monLineP.setAlpha(monA(intro * blink));
+        float rot = (this.time * 150.0f) % 360.0f;
+        for (int i = 0; i < 4; i++) {
+            c.drawArc(this.monRect, rot + (i * 90.0f) + 20.0f, 50.0f, false, this.monLineP);
+        }
+        c.save();
+        c.rotate(-((this.time * 60.0f) % 360.0f), cx, cy);
+        float r1 = base * 1.95f * zoom;
+        float r2 = base * 2.5f * zoom;
+        float w = this.pad * 0.22f;
+        this.monFillP.setColor(urgent ? 0xFFFF6A6A : -1);
+        this.monFillP.setAlpha(monA(intro * 0.9f * blink));
+        c.drawRect(cx + r1, cy - w, cx + r2, cy + w, this.monFillP);
+        c.drawRect(cx - r2, cy - w, cx - r1, cy + w, this.monFillP);
+        c.drawRect(cx - w, cy - r2, cx + w, cy - r1, this.monFillP);
+        c.drawRect(cx - w, cy + r1, cx + w, cy + r2, this.monFillP);
+        c.restore();
+        this.monFillP.setColor(-1);
+        c.drawCircle(cx, cy, base * 0.32f * ((0.18f * (float) Math.sin(this.time * 20.0f)) + 1.0f), this.monFillP);
+        this.monFillP.setColor(warm);
+        c.drawCircle(cx, cy, base * 0.15f, this.monFillP);
+    }
+
     void drawMonster(Canvas var1) {
-       boolean var16 = this.bossFight();
-       float var7 = this.mu;
-       float var6;
-       if (var16) {
-          var6 = 1.3F;
-       } else {
-          var6 = 1.0F;
-       }
+        if (this.W <= 0 || this.H <= 0) {
+            return;
+        }
+        Canvas c = var1;
+        boolean boss = this.bossFight();
+        Bitmap bmp = this.mobBitmap();
+        long now = SystemClock.uptimeMillis();
+        float t = this.time;
+        float s0 = this.mu * (boss ? 1.3f : 1.0f);
+        if (bmp != null && bmp.getWidth() > 24) {
+            s0 *= 0.62f;
+        }
+        float spawnK = this.monSpawnK();
+        if (this.mobSpawn + 1.0E-4f < this.monPrevSpawn) {
+            this.monSpawnAt = now;
+        }
+        this.monPrevSpawn = this.mobSpawn;
 
-       var7 *= var6;
-       var6 = var7;
-       if (this.mobBitmap().getWidth() > 24) {
-          var6 = var7 * 0.62F;
-       }
+        // HP ratio and delayed "damage trail" (purely visual smoothing)
+        double hpR = this.monsterMax > 0.0d ? this.monsterHp / this.monsterMax : 0.0d;
+        float hpK = Double.isNaN(hpR) ? 0.0f : (float) Math.max(0.0d, Math.min(1.0d, hpR));
+        float dt = this.monHpMs == 0L ? 0.0f : Math.max(0.0f, Math.min(0.1f, (now - this.monHpMs) / 1000.0f));
+        this.monHpMs = now;
+        if (hpK >= this.monHpTrail) {
+            this.monHpTrail = hpK;
+        } else {
+            this.monHpTrail = Math.max(hpK, (this.monHpTrail - ((this.monHpTrail - hpK) * Math.min(1.0f, dt * 3.2f))) - (dt * 0.04f));
+        }
 
-       float var9;
-       float var10;
-       Bitmap var18;
-       label99: {
-          var9 = this.mobSpawn * 0.7F + 0.3F;
-          var10 = (float)Math.sin((double)(this.time * 4.0F)) * 0.04F + this.mobHit * 0.14F + this.beatPulse * 0.07F;
-          var18 = this.mobBitmap();
-          if (var16) {
-             var7 = this.bossIntroT;
-             if (var7 > 1.0F) {
-                float var8 = (1.6F - var7) / 0.6F;
-                var7 = -(this.groundY - this.battleT);
-                var8 = 1.0F - var8;
-                var7 = var7 * var8 * var8;
-                break label99;
-             }
-          }
+        // boss drop from the sky (same curve as before)
+        float span = Math.max(1.0f, this.groundY - this.battleT);
+        float drop = 0.0f;
+        float introQ = 0.0f;
+        if (boss && this.bossIntroT > 1.0f) {
+            introQ = 1.0f - ((1.6f - this.bossIntroT) / 0.6f);
+            drop = -(this.groundY - this.battleT) * introQ * introQ;
+        }
 
-          var7 = 0.0F;
-       }
+        // per-species idle motion
+        int kind = bmp != null ? this.monKind(bmp) : 0;
+        boolean danger = hpK > 0.0f && hpK < 0.3f && this.monsterHp > 0.0d;
+        float sq;
+        float lift = 0.0f;
+        float tilt = 0.0f;
+        float jx = 0.0f;
+        switch (kind) {
+            case 1: {
+                float ph = (t / (boss ? 1.5f : 1.05f)) % 1.0f;
+                sq = 0.0f;
+                if (ph < 0.42f) {
+                    float hh = (float) Math.sin((ph / 0.42f) * Math.PI);
+                    lift = hh * this.mobR * (boss ? 0.08f : 0.13f);
+                    sq = -0.07f * hh;
+                } else if (ph < 0.62f) {
+                    float q = 1.0f - ((ph - 0.42f) / 0.2f);
+                    sq = 0.11f * q * q;
+                } else if (ph > 0.84f) {
+                    sq = ((ph - 0.84f) / 0.16f) * 0.06f;
+                }
+                break;
+            }
+            case 2:
+                lift = this.mobR * (0.11f + (0.06f * (float) Math.sin(t * 2.6f)));
+                sq = ((float) Math.sin(t * 10.4f)) * 0.035f;
+                tilt = ((float) Math.sin(t * 1.3f)) * 2.5f;
+                break;
+            case 3:
+                sq = ((float) Math.sin(t * (danger ? 4.0f : 2.2f))) * 0.05f;
+                break;
+            case 4:
+                sq = ((float) Math.sin(t * 4.0f)) * 0.03f;
+                tilt = ((float) Math.sin(t * 1.9f)) * 2.0f;
+                if ((t * 0.6f) % 1.0f < 0.14f) {
+                    jx = ((float) Math.sin(t * 80.0f)) * this.hu * 0.5f;
+                }
+                break;
+            case 5:
+                lift = Math.abs((float) Math.sin(t * 36.0f)) * this.hu * 0.35f;
+                sq = ((float) Math.sin(t * 18.0f)) * 0.012f;
+                break;
+            default:
+                sq = ((float) Math.sin(t * (danger ? 7.0f : 4.0f))) * 0.04f;
+                break;
+        }
+        if (danger) {
+            jx += ((float) Math.sin(t * 55.0f)) * this.hu * 0.3f;
+        }
 
-       if (var16) {
-          for (int var14 = 0; var14 < 12; var14++) {
-             float var11 = this.time;
-             double var4 = (double)var11;
-             double var2 = (double)var14;
-             float var32 = (float)((var4 * 0.5 + var2 / 12.0) % 1.0);
-             float var12 = this.mobX;
-             float var13 = (float)Math.sin(var2 * 2.4 + (double)var11);
-             var11 = this.mobR;
-             var12 += var13 * var11 * 0.9F;
-             var13 = this.groundY - var11 * var32 * 2.6F + var7;
-             var11 = this.hu * (1.6F - 1.1F * var32);
-             Paint var17 = this.p;
-             int var15;
-             if (this.towerFight) {
-                var15 = -24512;
-             } else {
-                var15 = -5234614;
-             }
+        // hit reaction: knockback away from the hero, backward tilt, impact jitter
+        float hit = monClamp(this.mobHit);
+        float h2 = hit * hit;
+        float recoil = h2 * this.mobR * (boss ? 0.12f : 0.22f);
+        tilt += h2 * (boss ? 3.0f : 6.5f);
+        if (hit > 0.5f) {
+            jx += ((float) Math.sin(t * 95.0f)) * this.hu * 0.6f * hit;
+        }
+        float v = sq + (hit * 0.14f) + (this.beatPulse * 0.07f);
+        float sx = 1.0f + v;
+        float sy = 1.0f - v;
+        float scale = s0 * spawnK;
+        float px = this.mobX + recoil + jx;
+        float bottom = ((this.groundY + s0) + drop) - lift;
+        float bwPx = bmp != null ? bmp.getWidth() : 18.0f;
+        float bhPx = bmp != null ? bmp.getHeight() : 18.0f;
+        float sprW = bwPx * scale * sx;
+        float sprH = bhPx * scale * sy;
+        int bossCol = this.towerFight ? -24512 : -2078616;
+        float ringA = boss ? (drop < 0.0f ? monClamp(1.0f - introQ) : 1.0f) : 0.0f;
+        float rrx = Math.max(this.mobR * 1.35f, sprW * 0.62f);
+        float rry = rrx * 0.28f;
 
-             var17.setColor(var15);
-             this.p.setAlpha((int)((1.0F - var32) * 150.0F));
-             var1.drawRect(var12 - var11, var13 - var11, var12 + var11, var13 + var11, this.p);
-          }
+        // --- ground layer: light pool, back half of the rune circle, rising embers
+        if (boss) {
+            this.monEnsureGlow((int) (this.mobR * 1.8f), bossCol);
+            float pul = 0.5f + (0.5f * (float) Math.sin(t * 3.2f));
+            this.monGlow(c, this.mobX, this.groundY, 1.25f, 0.3f, monA(ringA * (0.55f + (0.25f * pul))));
+            this.monDrawRing(c, false, bossCol, this.mobX, this.groundY, rrx, rry, ringA);
+            for (int i = 0; i < 12; i++) {
+                float ph = (float) (((t * 0.5d) + (i / 12.0d)) % 1.0d);
+                float ex = this.mobX + ((float) Math.sin((i * 2.4d) + t) * this.mobR * 0.9f);
+                float ey = (this.groundY - (this.mobR * ph * 2.6f)) + drop;
+                float es = this.hu * (1.6f - (1.1f * ph));
+                this.p.setColor(this.towerFight ? -24512 : -5234614);
+                this.p.setAlpha((int) ((1.0f - ph) * 150.0f));
+                c.drawRect(ex - es, ey - es, ex + es, ey + es, this.p);
+                float cs = es * 0.45f;
+                this.p.setColor(0xFFFFE0B0);
+                this.p.setAlpha((int) ((1.0f - ph) * (1.0f - ph) * 200.0f));
+                c.drawRect(ex - cs, ey - cs, ex + cs, ey + cs, this.p);
+            }
+            this.p.setAlpha(255);
+        } else if (this.chest) {
+            this.monEnsureGlow((int) (this.mobR * 1.5f), -11430);
+            this.monGlow(c, this.mobX, this.groundY, 1.2f, 0.3f, monA(0.35f + (0.15f * (float) Math.sin(t * 4.0f))));
+        }
 
-          this.p.setAlpha(255);
-       }
+        // --- stepped soft shadow that shrinks while the monster is airborne
+        float fallK = drop < 0.0f ? Math.max(0.2f, (drop / span) + 1.0f) : 1.0f;
+        float liftK = 1.0f - Math.min(0.45f, (lift / Math.max(1.0f, this.mobR)) * 1.6f);
+        float shw = Math.max(s0 * 8.0f, bwPx * s0 * 0.46f) * spawnK * fallK * liftK * (1.0f + (v * 0.5f));
+        float shh = s0 * (0.8f + (0.2f * liftK));
+        float shx = this.mobX + (recoil * 0.4f);
+        this.monFillP.setColor(0x26000000);
+        this.monRect.set(shx - (shw * 1.22f), this.groundY - (shh * 1.45f), shx + (shw * 1.22f), this.groundY + (shh * 1.45f));
+        c.drawOval(this.monRect, this.monFillP);
+        this.monFillP.setColor(0x38000000);
+        this.monRect.set(shx - shw, this.groundY - shh, shx + shw, this.groundY + shh);
+        c.drawOval(this.monRect, this.monFillP);
+        this.monFillP.setColor(0x40000000);
+        this.monRect.set(shx - (shw * 0.62f), this.groundY - (shh * 0.65f), shx + (shw * 0.62f), this.groundY + (shh * 0.65f));
+        c.drawOval(this.monRect, this.monFillP);
 
-       this.p.setColor(1426063360);
-       float var33;
-       if (var7 < 0.0F) {
-          var33 = Math.max(0.2F, var7 / (this.groundY - this.battleT) + 1.0F);
-       } else {
-          var33 = 1.0F;
-       }
+        // --- sprite (aura, rim light, body, tints, flash)
+        if (bmp != null) {
+            float midY = bottom - (sprH * 0.5f);
+            if (boss) {
+                float pz = 1.0f + (0.07f * (float) Math.sin(t * 3.2f)) + (this.beatPulse * 0.12f) + (h2 * 0.1f);
+                float gr = Math.max(1.0f, this.monGlowR);
+                this.monGlow(c, px, midY, Math.max(1.45f, sprW / gr) * pz, Math.max(1.45f, sprH / gr) * pz, monA(ringA * (0.7f + (0.3f * (float) Math.sin(t * 3.2f)))));
+            }
+            c.save();
+            c.rotate(tilt, px, bottom);
+            if (kind == 5) {
+                this.monDrawBeam(c, false, px, bottom, scale * sx, scale * sy, bmp);
+            }
+            Paint rim = boss ? (this.towerFight ? this.monRimTowerP : this.monRimBossP) : (this.chest ? this.monRimGoldP : null);
+            if (rim != null) {
+                float ra = boss ? 0.38f + (0.22f * (float) Math.sin(t * 3.2f)) + (0.2f * this.beatPulse) : 0.32f + (0.26f * (float) Math.sin(t * 4.0f));
+                rim.setAlpha(monA(ra));
+                float ox = scale * sx;
+                blit(c, bmp, px - ox, bottom, scale, sx, sy, rim);
+                blit(c, bmp, px + ox, bottom, scale, sx, sy, rim);
+                blit(c, bmp, px, bottom - (scale * sy), scale, sx, sy, rim);
+            }
+            blit(c, bmp, px, bottom, scale, sx, sy, hit > 0.7f ? this.flashP : this.bp);
+            if (danger) {
+                this.monRedP.setAlpha(monA(0.16f + (0.16f * (float) Math.sin(t * 9.0f))));
+                blit(c, bmp, px, bottom, scale, sx, sy, this.monRedP);
+            }
+            float hq = hit > 0.55f ? (hit - 0.55f) / 0.45f : 0.0f;
+            float fl = Math.max(hq * hq * 0.75f, 1.0f - monClamp(this.mobSpawn));
+            if (fl > 0.01f) {
+                this.monWhiteP.setAlpha(monA(fl));
+                blit(c, bmp, px, bottom, scale, sx, sy, this.monWhiteP);
+            }
+            if (kind == 5) {
+                this.monDrawBeam(c, true, px, bottom, scale * sx, scale * sy, bmp);
+            }
+            c.restore();
+            this.monDrawnBmp = bmp;
+            this.monDrawnX = px;
+            this.monDrawnB = bottom;
+            this.monDrawnS = scale;
+            this.monDrawnSx = sx;
+            this.monDrawnSy = sy;
+            if (this.chest && !boss) {
+                this.monDrawGlints(c, px, bottom, sprW, sprH);
+            }
+        }
 
-       RectF var61 = this.r;
-       float var51 = this.mobX;
-       float var54 = var6 * 8.0F * var9 * var33;
-       var33 = this.groundY;
-       var61.set(var51 - var54, var33 - var6, var51 + var54, var33 + var6);
-       var1.drawOval(this.r, this.p);
-       var33 = this.mobX;
-       var51 = this.groundY;
-       Paint var62;
-       if (this.mobHit > 0.7F) {
-          var62 = this.flashP;
-       } else {
-          var62 = this.bp;
-       }
+        // --- foreground fx
+        if (boss) {
+            this.monDrawRing(c, true, bossCol, this.mobX, this.groundY, rrx, rry, ringA);
+            this.monDrawIntroFx(c, px, bottom, sprW, sprH, bossCol);
+        }
+        this.monDrawSpawnFx(c, now, boss);
+        this.monDrawGhost(c, now);
 
-       this.blit(var1, var18, var33, var51 + var6 + var7, var6 * var9, var10 + 1.0F, 1.0F - var10, var62);
-       if (this.overlay != 11 || this.superHit) {
-          if (!var16 || !(this.bossIntroT > 0.25F)) {
-             var6 = (float)this.W * 0.42F;
-             var7 = this.mobX - var6 / 2.0F;
-             var33 = this.battleT + this.pad * 8.0F;
-             this.tp.setTextAlign(Align.CENTER);
-             this.tp.setTextSize(this.pad * 2.0F);
-             this.tp.setFakeBoldText(true);
-             StringBuilder var77 = new StringBuilder();
-             String var63;
-             if (var16) {
-                var63 = "\ud83d\udc51 ";
-             } else {
-                var63 = "";
-             }
-
-             String var64 = var77.append(var63).append(this.mobName()).toString();
-             this.tp.setColor(-872415232);
-             var10 = this.mobX;
-             var9 = this.pad;
-             var1.drawText(var64, var10 + 0.25F * var9, var33 - var9 * 0.55F, this.tp);
-             Paint var78 = this.tp;
-             int var56;
-             if (var16) {
-                var56 = -38278;
-             } else if (this.chest) {
-                var56 = -11430;
-             } else {
-                var56 = -1;
-             }
-
-             var78.setColor(var56);
-             var1.drawText(var64, this.mobX, var33 - this.pad * 0.8F, this.tp);
-             this.tp.setFakeBoldText(false);
-             this.p.setColor(-16777216);
-             var61 = this.r;
-             var9 = var7 + var6;
-             var61.set(var7, var33, var9, this.pad * 1.6F + var33);
-             var61 = this.r;
-             var10 = this.pad;
-             var1.drawRoundRect(var61, var10 * 0.8F, var10 * 0.8F, this.p);
-             var10 = (float)Math.max(0.0, Math.min(1.0, this.monsterHp / this.monsterMax));
-             Paint var67 = this.p;
-             if (var16) {
-                var56 = -2078616;
-             } else {
-                var56 = -10822550;
-             }
-
-             var67.setColor(var56);
-             this.r.set(var7, var33, var10 * var6 + var7, this.pad * 1.6F + var33);
-             var61 = this.r;
-             var10 = this.pad;
-             var1.drawRoundRect(var61, var10 * 0.8F, var10 * 0.8F, this.p);
-             this.tp.setTextSize(this.pad * 1.3F);
-             this.tp.setColor(-1);
-             var1.drawText(fmt(Math.max(0.0, this.monsterHp)) + " / " + fmt(this.monsterMax), this.mobX, this.pad * 1.2F + var33, this.tp);
-             if (var16) {
-                var10 = Math.max(0.0F, this.bossTime / this.bossTimeMax());
-                var33 += this.pad * 2.2F;
+        // --- name plate, HP bar, boss timer (positions and texts unchanged)
+        if (this.overlay != 11 || this.superHit) {
+            if (!boss || !(this.bossIntroT > 0.25F)) {
+                float barW = (float) this.W * 0.42F;
+                float barL = this.mobX - (barW / 2.0F);
+                float barT = this.battleT + (this.pad * 8.0F);
+                float barH = this.pad * 1.6F;
+                this.tp.setTextAlign(Align.CENTER);
+                this.tp.setTextSize(this.pad * 2.0F);
+                this.tp.setFakeBoldText(true);
+                String name = new StringBuilder().append(boss ? "👑 " : "").append(this.mobName()).toString();
+                this.tp.setColor(-872415232);
+                c.drawText(name, this.mobX + (0.25F * this.pad), barT - (this.pad * 0.55F), this.tp);
+                this.tp.setColor(boss ? -38278 : (this.chest ? -11430 : -1));
+                c.drawText(name, this.mobX, barT - (this.pad * 0.8F), this.tp);
+                this.tp.setFakeBoldText(false);
                 this.p.setColor(-16777216);
-                this.r.set(var7, var33, var9, this.pad * 0.9F + var33);
-                var61 = this.r;
-                var9 = this.pad;
-                var1.drawRoundRect(var61, var9 * 0.45F, var9 * 0.45F, this.p);
-                Paint var70 = this.p;
-                float var80;
-                int var60 = (var80 = var10 - 0.3F) == 0.0F ? 0 : (var80 < 0.0F ? -1 : 1);
-                if (var60 < 0) {
-                   var56 = -46518;
-                } else {
-                   var56 = -16310;
+                this.r.set(barL, barT, barL + barW, barT + barH);
+                c.drawRoundRect(this.r, this.pad * 0.8F, this.pad * 0.8F, this.p);
+                if (this.monHpTrail > hpK + 0.002f) {
+                    this.monFillP.setColor(0xFFFFF1C4);
+                    this.monFillP.setAlpha(monA(0.75f + (0.25f * (float) Math.sin(t * 18.0f))));
+                    this.monRect.set(barL, barT, barL + (this.monHpTrail * barW), barT + barH);
+                    c.drawRoundRect(this.monRect, this.pad * 0.8F, this.pad * 0.8F, this.monFillP);
                 }
-
-                var70.setColor(var56);
-                this.r.set(var7, var33, var6 * var10 + var7, this.pad * 0.9F + var33);
-                var61 = this.r;
-                var6 = this.pad;
-                var1.drawRoundRect(var61, var6 * 0.45F, var6 * 0.45F, this.p);
-                this.tp.setTextSize(this.pad * 1.4F);
-                Paint var72 = this.tp;
-                if (var60 < 0) {
-                   var56 = -38294;
-                } else {
-                   var56 = -8032;
+                int fillC = boss ? -2078616 : -10822550;
+                if (hpK < 0.25f) {
+                    fillC = monShade(fillC, 1.0f + (0.35f * (0.5f + (0.5f * (float) Math.sin(t * 10.0f)))));
                 }
-
-                var72.setColor(var56);
-                StringBuilder var79 = new StringBuilder().append("⏳ ").append((int)Math.ceil((double)Math.max(0.0F, this.bossTime))).append("с");
-                String var73;
-                if (this.trait() > 0) {
-                   var73 = "  " + TRAIT_SHORT[this.trait()];
-                } else {
-                   var73 = "";
+                this.p.setColor(fillC);
+                this.r.set(barL, barT, (hpK * barW) + barL, barT + barH);
+                c.drawRoundRect(this.r, this.pad * 0.8F, this.pad * 0.8F, this.p);
+                this.monBarGloss(c, barL, barT, barL + (hpK * barW), barW, barH, boss);
+                this.monLineP.setStrokeWidth(Math.max(1.0f, this.hu * 0.3f));
+                this.monLineP.setColor(boss ? 0x99FFD35A : 0x55FFFFFF);
+                this.monRect.set(barL, barT, barL + barW, barT + barH);
+                c.drawRoundRect(this.monRect, this.pad * 0.8F, this.pad * 0.8F, this.monLineP);
+                this.tp.setTextSize(this.pad * 1.3F);
+                String hpTxt = fmt(Math.max(0.0d, this.monsterHp)) + " / " + fmt(this.monsterMax);
+                this.tp.setColor(0xB4000000);
+                c.drawText(hpTxt, this.mobX + (this.hu * 0.25f), (this.pad * 1.2F) + barT + (this.hu * 0.25f), this.tp);
+                this.tp.setColor(-1);
+                c.drawText(hpTxt, this.mobX, (this.pad * 1.2F) + barT, this.tp);
+                if (boss) {
+                    float tm = this.bossTimeMax();
+                    float tk = tm > 0.0f ? Math.max(0.0F, this.bossTime / tm) : 0.0f;
+                    if (Float.isNaN(tk)) {
+                        tk = 0.0f;
+                    }
+                    float y2 = barT + (this.pad * 2.2F);
+                    float tH = this.pad * 0.9F;
+                    boolean hurry = tk < 0.3F;
+                    this.p.setColor(-16777216);
+                    this.r.set(barL, y2, barL + barW, tH + y2);
+                    c.drawRoundRect(this.r, this.pad * 0.45F, this.pad * 0.45F, this.p);
+                    float hb = 0.5f + (0.5f * (float) Math.sin(t * 14.0f));
+                    this.p.setColor(hurry ? monShade(-46518, 0.8f + (0.4f * hb)) : -16310);
+                    float tR = Math.min(barW, barW * tk) + barL;
+                    this.r.set(barL, y2, tR, tH + y2);
+                    c.drawRoundRect(this.r, this.pad * 0.45F, this.pad * 0.45F, this.p);
+                    if (tR - barL > this.pad) {
+                        this.monFillP.setColor(-1);
+                        this.monFillP.setAlpha(75);
+                        c.drawRect(barL + (this.pad * 0.4f), y2 + (tH * 0.14f), tR - (this.pad * 0.4f), y2 + (tH * 0.4f), this.monFillP);
+                    }
+                    if (hurry) {
+                        float o = this.hu * 0.45f;
+                        this.monLineP.setStrokeWidth(Math.max(1.0f, this.hu * 0.4f));
+                        this.monLineP.setColor(-46518);
+                        this.monLineP.setAlpha(monA(0.3f + (0.6f * hb)));
+                        this.monRect.set(barL - o, y2 - o, barL + barW + o, tH + y2 + o);
+                        c.drawRoundRect(this.monRect, this.pad * 0.6F, this.pad * 0.6F, this.monLineP);
+                    }
+                    this.tp.setTextSize(this.pad * 1.4F);
+                    this.tp.setColor(hurry ? -38294 : -8032);
+                    StringBuilder tsb = new StringBuilder().append("⏳ ").append((int) Math.ceil((double) Math.max(0.0F, this.bossTime))).append("с");
+                    String trTxt = this.trait() > 0 ? "  " + TRAIT_SHORT[this.trait()] : "";
+                    c.drawText(tsb.append(trTxt).toString(), this.mobX, (this.pad * 2.5F) + y2, this.tp);
+                    if (this.storyBoss()) {
+                        this.tp.setTextSize(this.pad * 1.45F);
+                        this.tp.setFakeBoldText(true);
+                        float tw = this.tp.measureText("📖 Сюжетный босс");
+                        float pd = this.pad;
+                        float by = y2 + (3.6F * pd);
+                        float half = (tw + (pd * 2.0F)) / 2.0F;
+                        this.r.set(this.mobX - half, by, this.mobX + half, (pd * 2.4F) + by);
+                        this.p.setColor(-583390704);
+                        c.drawRoundRect(this.r, this.pad * 1.2F, this.pad * 1.2F, this.p);
+                        this.p.setStyle(Style.STROKE);
+                        this.p.setStrokeWidth(this.pad * 0.18F);
+                        this.p.setColor(-11430);
+                        this.p.setAlpha((int) ((Math.sin((double) (this.time * 3.0F)) * 85.0d) + 170.0d));
+                        c.drawRoundRect(this.r, this.pad * 1.2F, this.pad * 1.2F, this.p);
+                        this.p.setStyle(Style.FILL);
+                        this.p.setAlpha(255);
+                        this.tp.setColor(-11430);
+                        c.drawText("📖 Сюжетный босс", this.mobX, by + (this.pad * 1.7F), this.tp);
+                        this.tp.setFakeBoldText(false);
+                    }
                 }
-
-                var1.drawText(var79.append(var73).toString(), this.mobX, this.pad * 2.5F + var33, this.tp);
-                if (this.storyBoss()) {
-                   this.tp.setTextSize(this.pad * 1.45F);
-                   this.tp.setFakeBoldText(true);
-                   var9 = this.tp.measureText("\ud83d\udcd6 Сюжетный босс");
-                   var7 = this.pad;
-                   var6 = var33 + 3.6F * var7;
-                   var61 = this.r;
-                   var33 = this.mobX;
-                   var9 = (var9 + var7 * 2.0F) / 2.0F;
-                   var61.set(var33 - var9, var6, var33 + var9, var7 * 2.4F + var6);
-                   this.p.setColor(-583390704);
-                   var61 = this.r;
-                   var7 = this.pad;
-                   var1.drawRoundRect(var61, var7 * 1.2F, var7 * 1.2F, this.p);
-                   this.p.setStyle(Style.STROKE);
-                   this.p.setStrokeWidth(this.pad * 0.18F);
-                   this.p.setColor(-11430);
-                   this.p.setAlpha((int)(Math.sin((double)(this.time * 3.0F)) * 85.0 + 170.0));
-                   var61 = this.r;
-                   var7 = this.pad;
-                   var1.drawRoundRect(var61, var7 * 1.2F, var7 * 1.2F, this.p);
-                   this.p.setStyle(Style.FILL);
-                   this.p.setAlpha(255);
-                   this.tp.setColor(-11430);
-                   var1.drawText("\ud83d\udcd6 Сюжетный босс", this.mobX, var6 + this.pad * 1.7F, this.tp);
-                   this.tp.setFakeBoldText(false);
-                }
-             }
-          }
-       }
+            }
+        }
     }
 
     void drawOverlay(Canvas canvas) {
@@ -8360,15 +8910,38 @@ public class GameView extends View implements Runnable {
 
     void shatter() {
         Bitmap mobBitmap = mobBitmap();
-        float f = this.mu * (bossFight() ? 1.3f : 1.0f);
+        if (mobBitmap == null) {
+            return;
+        }
+        boolean boss = bossFight();
+        float f = this.mu * (boss ? 1.3f : 1.0f);
         if (mobBitmap.getWidth() > 24) {
             f *= 0.62f;
         }
-        float f2 = f * ((this.mobSpawn * 0.7f) + 0.3f);
-        float width = this.mobX - ((mobBitmap.getWidth() * f2) / 2.0f);
-        float height = (this.groundY + f2) - (mobBitmap.getHeight() * f2);
+        // debris starts exactly where the sprite was last drawn (incl. hop, recoil, squash)
+        float f2;
+        float cellW;
+        float cellH;
+        float bx;
+        float bb;
+        if (this.monDrawnBmp == mobBitmap && this.monDrawnS > 0.0f) {
+            f2 = this.monDrawnS;
+            cellW = f2 * this.monDrawnSx;
+            cellH = f2 * this.monDrawnSy;
+            bx = this.monDrawnX;
+            bb = this.monDrawnB;
+        } else {
+            f2 = f * monSpawnK();
+            cellW = f2;
+            cellH = f2;
+            bx = this.mobX;
+            bb = this.groundY + f2;
+        }
+        float width = bx - ((mobBitmap.getWidth() * cellW) / 2.0f);
+        float height = bb - (mobBitmap.getHeight() * cellH);
         int i = mobBitmap.getWidth() > 24 ? 3 : 2;
         float f3 = this.W / 1080.0f;
+        float boost = boss ? 1.15f : 1.0f;
         for (int i2 = OV_NONE; i2 < mobBitmap.getHeight(); i2 += i) {
             for (int i3 = OV_NONE; i3 < mobBitmap.getWidth(); i3 += i) {
                 int pixel = mobBitmap.getPixel(i3, i2);
@@ -8376,20 +8949,51 @@ public class GameView extends View implements Runnable {
                     Fx fx = new Fx();
                     float f4 = i;
                     float f5 = f4 / 2.0f;
-                    fx.x = ((i3 + f5) * f2) + width;
-                    fx.y = ((i2 + f5) * f2) + height;
-                    fx.vx = ((fx.x - this.mobX) * 4.0f) + ((this.rnd.nextFloat() - 0.5f) * 420.0f * f3);
-                    fx.vy = ((fx.y - this.mobY) * 2.5f) - (((this.rnd.nextFloat() * 520.0f) + 380.0f) * f3);
-                    fx.size = f4 * f2;
-                    fx.color = pixel;
+                    fx.x = ((i3 + f5) * cellW) + width;
+                    fx.y = ((i2 + f5) * cellH) + height;
+                    fx.vx = (((fx.x - this.mobX) * 4.0f) + ((this.rnd.nextFloat() - 0.5f) * 420.0f * f3)) * boost + (90.0f * f3);
+                    fx.vy = (((fx.y - this.mobY) * 2.5f) - (((this.rnd.nextFloat() * 520.0f) + 380.0f) * f3)) * boost;
+                    fx.size = f4 * f2 * (0.8f + (this.monRnd.nextFloat() * 0.45f));
+                    float shade = this.monRnd.nextFloat();
+                    fx.color = shade < 0.22f ? monShade(pixel, 1.35f) : shade < 0.38f ? monShade(pixel, 0.7f) : pixel;
                     fx.max = (this.rnd.nextFloat() * 0.6f) + 0.9f;
                     this.chunks.add(fx);
                 }
             }
         }
+        // hot sparks flying out of the core
+        int mc = mobColor();
+        float cxm = bx;
+        float cym = bb - (mobBitmap.getHeight() * cellH * 0.5f);
+        int n = boss ? 28 : 12;
+        for (int s = OV_NONE; s < n; s++) {
+            Fx fx = new Fx();
+            double a = this.monRnd.nextDouble() * Math.PI * 2.0d;
+            float ca = (float) Math.cos(a);
+            float sa = (float) Math.sin(a);
+            float sp = ((this.monRnd.nextFloat() * 900.0f) + 450.0f) * f3 * boost;
+            fx.x = cxm + (ca * this.mobR * 0.2f);
+            fx.y = cym + (sa * this.mobR * 0.2f);
+            fx.vx = ca * sp;
+            fx.vy = (sa * sp) - (260.0f * f3);
+            fx.size = f2 * (0.45f + (this.monRnd.nextFloat() * 0.4f));
+            int m3 = s % 3;
+            fx.color = m3 == 0 ? -1 : m3 == 1 ? 0xFFFFF0A0 : monShade(mc, 1.35f);
+            fx.max = (this.monRnd.nextFloat() * 0.35f) + 0.35f;
+            this.chunks.add(fx);
+        }
         while (this.chunks.size() > 450) {
             this.chunks.remove(OV_NONE);
         }
+        this.monDeadBmp = mobBitmap;
+        this.monDeadX = bx;
+        this.monDeadB = bb;
+        this.monDeadS = f2;
+        this.monDeadSx = f2 > 0.0f ? cellW / f2 : 1.0f;
+        this.monDeadSy = f2 > 0.0f ? cellH / f2 : 1.0f;
+        this.monDeadAt = SystemClock.uptimeMillis();
+        this.monDeadCol = mc;
+        this.monDeadBoss = boss;
     }
 
     void showBanner(String str, int i) {
@@ -8637,20 +9241,19 @@ public class GameView extends View implements Runnable {
         float cy = this.mobY + this.wsY;
         float base = this.pad * 2.2f;
         float pulse = (float) Math.sin(this.time * 14.0f) * 0.15f + 1.0f;
-        this.p.setStyle(Style.STROKE);
-        this.p.setStrokeWidth(this.pad * 0.45f);
-        this.p.setColor(-10496);
-        canvas.drawCircle(cx, cy, base * pulse, this.p);
-        this.p.setColor(-42406);
-        canvas.drawCircle(cx, cy, base * (1.0f + (2.2f * k)), this.p);
-        this.p.setStyle(Style.FILL);
-        this.p.setColor(-1);
-        canvas.drawCircle(cx, cy, base * 0.3f, this.p);
+        monDrawWeak(canvas, cx, cy, base, pulse, k, now);
         if (this.wsStreak > 1) {
+            if (this.monWsStrN != this.wsStreak) {
+                this.monWsStrN = this.wsStreak;
+                this.monWsStr = "x" + this.wsStreak;
+            }
             this.tp.setTextAlign(Paint.Align.CENTER);
             this.tp.setTextSize(this.pad * 2.0f);
+            float ty = cy - (base * 2.75f);
+            this.tp.setColor(0xCC000000);
+            canvas.drawText(this.monWsStr, cx + (this.pad * 0.22f), ty + (this.pad * 0.22f), this.tp);
             this.tp.setColor(-10496);
-            canvas.drawText("x" + this.wsStreak, cx, cy - (base * 1.8f), this.tp);
+            canvas.drawText(this.monWsStr, cx, ty, this.tp);
         }
     }
 
