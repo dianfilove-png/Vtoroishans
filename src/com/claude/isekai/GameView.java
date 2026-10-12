@@ -1958,15 +1958,45 @@ public class GameView extends View implements Runnable {
             float f8 = ((i / 2) * f4) + f3;
             boolean z = (this.achMask & (1 << i)) != 0;
             this.r.set((f6 * 0.3f) + f7, f8, (f7 + f5) - (f6 * 0.3f), (f8 + f4) - (f6 * 0.5f));
-            this.p.setColor(z ? -12963304 : -14805453);
             RectF rectF = this.r;
             float f9 = this.pad;
-            canvas.drawRoundRect(rectF, f9, f9, this.p);
+            menuCard(canvas, rectF, f9, z ? -12963304 : -14805453, z ? -11430 : -12963760, false, 6, true);
+            if (z) {
+                // gold rim, periodic shine sweep and a twinkling star
+                float pu = menuPulse(2.2f, i * 0.7f);
+                this.menuLine.setStyle(Paint.Style.STROKE);
+                this.menuLine.setStrokeWidth(Math.max(1.0f, f9 * 0.18f));
+                this.menuLine.setColor(menuAlpha(-11430, (int) (110.0f + 110.0f * pu)));
+                canvas.drawRoundRect(rectF, f9, f9, this.menuLine);
+                menuShine(canvas, rectF, f9, ((this.time * 0.3f) + (i * 0.173f)) % 2.6f, 120);
+                float tw = (float) Math.sin((this.time * 2.6f) + (i * 1.9f));
+                if (tw > 0.0f) {
+                    menuSpark(canvas, rectF.right - (f9 * 1.3f), rectF.top + (f9 * 1.1f), Math.max(1.0f, f9 * 0.2f), -11430, (int) (255.0f * tw));
+                }
+            } else {
+                // locked: dimmed with a faint diagonal hatch
+                this.menuPath.reset();
+                this.menuPath.addRoundRect(rectF, f9, f9, Path.Direction.CW);
+                canvas.save();
+                canvas.clipPath(this.menuPath);
+                this.menuLine.setStyle(Paint.Style.STROKE);
+                this.menuLine.setStrokeWidth(Math.max(1.0f, f9 * 0.22f));
+                this.menuLine.setColor(0x14FFFFFF);
+                float hh = rectF.height();
+                for (float hx = rectF.left - hh; hx < rectF.right; hx += f9 * 2.0f) {
+                    canvas.drawLine(hx, rectF.bottom, hx + hh, rectF.top, this.menuLine);
+                }
+                canvas.restore();
+            }
             this.tp.setTextAlign(Paint.Align.LEFT);
             this.tp.setTextSize(Math.min(this.pad * 1.7f, 0.3f * f4));
             this.tp.setFakeBoldText(true);
             this.tp.setColor(z ? -11430 : -7569238);
+            if (z) {
+                this.tp.setShadowLayer(1.0f, 0.0f, this.pad * 0.14f, 0xC0000000);
+            }
             drawFit(canvas, (z ? "🏆 " : "🔒 ") + strArr[i], this.r.left + this.pad, this.r.top + (0.42f * f4), this.r.width() - (this.pad * 2.0f));
+            this.tp.clearShadowLayer();
             this.tp.setFakeBoldText(false);
             this.tp.setTextSize(Math.min(this.pad * 1.3f, 0.24f * f4));
             this.tp.setColor(z ? -2570096 : -9543024);
@@ -2395,6 +2425,7 @@ public class GameView extends View implements Runnable {
         To view partially-correct add '--show-bad-code' argument
     */
     void drawAltar(Canvas var1) {
+       this.menuBackdrop(var1);
        float var4 = this.rowH;
        boolean var10 = this.ascUnlocked();
        if (var10) {
@@ -2437,6 +2468,8 @@ public class GameView extends View implements Runnable {
           }
 
           this.rowBox(var1, var5, false, var7, String.valueOf(var8), var14, var13, var11, var9, -13664328, var12);
+          int menuMax = ALT_MAX[var5];
+          this.menuRowBar(var1, menuMax > 0 ? (float)var8 / (float)menuMax : 0.0F, var6 ? -11430 : var7, menuMax <= 12 ? menuMax : 0, var5);
        }
 
        if (var10) {
@@ -2470,6 +2503,10 @@ public class GameView extends View implements Runnable {
        this.tp.setTextAlign(Align.CENTER);
        this.tp.setTextSize(this.pad * 1.3F);
        this.tp.setColor(-9543024);
+       float menuFy = (float)this.H * 0.992F - this.pad * 0.45F;
+       float menuFw = Math.min(this.tp.measureText("Потраченные души больше не усиливают урон — выбирай с умом"), (float)this.W - this.pad * 6.0F) * 0.5F + this.pad * 1.2F;
+       this.menuDiamond(var1, (float)this.W / 2.0F - menuFw, menuFy, this.pad * 0.3F, menuAlpha(-7712808, 170));
+       this.menuDiamond(var1, (float)this.W / 2.0F + menuFw, menuFy, this.pad * 0.3F, menuAlpha(-7712808, 170));
        var1.drawText("Потраченные души больше не усиливают урон — выбирай с умом", (float)this.W / 2.0F, (float)this.H * 0.992F, this.tp);
     }
 
@@ -5200,12 +5237,15 @@ public class GameView extends View implements Runnable {
              var13 = -14805453;
           }
 
-          var32.setColor(var13);
           var19 = this.r;
           var6 = this.pad;
-          var1.drawRoundRect(var19, var6, var6, this.p);
+          this.menuCell.set(var19);
+          this.menuCard(var1, var19, var6, var13, var16 ? -6295297 : (var15 ? -7569238 : -12963760), false, 6, true);
           Bitmap var20 = this.beastBmp(var14);
           float var9 = var5 * 0.34F;
+          if (var20 == null || var20.getWidth() <= 0 || var20.getHeight() <= 0) {
+             continue;
+          }
           float var12 = 0.78F * var3;
           var7 = Math.min(var9 / (float)var20.getWidth(), var12 / (float)var20.getHeight());
           float var11 = this.r.left;
@@ -5220,7 +5260,29 @@ public class GameView extends View implements Runnable {
              var34 = this.silP;
           }
 
-          this.blit(var1, var20, var6 + var11 + var10 * 0.4F, var8 - var12, var7, 1.0F, 1.0F, var34);
+          float menuBx = var6 + var11 + var10 * 0.4F;
+          float menuBy = var8 - var12;
+          if (var16) {
+             // studied: soft cyan aura behind the sprite
+             this.menuGlowAt(var1, 47, menuBx, menuBy - (float)var20.getHeight() * var7 * 0.5F, var3 * 0.5F, -6295297, (int)(120.0F + 80.0F * this.menuPulse(2.4F, var14 * 0.6F)));
+          }
+          if (var15) {
+             // ground shadow under the sprite
+             this.menuFill.setStyle(Style.FILL);
+             this.menuFill.setColor(0x60000000);
+             float menuSw = var9 * 0.36F;
+             this.menuArc.set(menuBx - menuSw, menuBy - this.pad * 0.35F, menuBx + menuSw, menuBy + this.pad * 0.2F);
+             var1.drawOval(this.menuArc, this.menuFill);
+          }
+          this.blit(var1, var20, menuBx, menuBy, var7, 1.0F, 1.0F, var34);
+          if (var16) {
+             float menuTw = (float)Math.sin(this.time * 2.8F + var14 * 1.37F);
+             this.menuSpark(var1, this.menuCell.right - this.pad * 1.1F, this.menuCell.top + this.pad * 1.0F, Math.max(1.0F, this.pad * 0.18F), -6295297, menuTw > 0.0F ? (int)(255.0F * menuTw) : 0);
+             this.menuLine.setStyle(Style.STROKE);
+             this.menuLine.setStrokeWidth(Math.max(1.0F, this.pad * 0.16F));
+             this.menuLine.setColor(menuAlpha(-6295297, (int)(90.0F + 90.0F * this.menuPulse(2.4F, var14 * 0.6F))));
+             var1.drawRoundRect(this.menuCell, this.pad, this.pad, this.menuLine);
+          }
           this.tp.setTextAlign(Align.LEFT);
           this.tp.setFakeBoldText(true);
           this.tp.setTextSize(Math.min(this.pad * 1.35F, 0.22F * var3));
@@ -5264,6 +5326,14 @@ public class GameView extends View implements Runnable {
           }
 
           this.drawFit(var1, var38, var7, var4 + 0.72F * var3, var6);
+          if (var15 && !var16) {
+             int menuNeed = this.beastNeed(var14);
+             float menuY1 = this.menuCell.bottom - this.pad * 0.45F;
+             float menuY0 = menuY1 - this.pad * 0.35F;
+             if (menuNeed > 0 && menuY0 >= var4 + 0.72F * var3 + this.pad * 0.3F) {
+                this.menuBar(var1, var7, menuY0, var7 + var6, menuY1, (float)this.bk[var14] / (float)menuNeed, -7569238, 0, var14);
+             }
+          }
        }
     }
 
@@ -8880,6 +8950,7 @@ public class GameView extends View implements Runnable {
     }
 
     void drawQuests(Canvas var1) {
+       this.menuBackdrop(var1);
        int var5 = 0;
 
        while (true) {
@@ -8928,6 +8999,7 @@ public class GameView extends View implements Runnable {
              }
 
              this.rowBox(var1, 3, var26, var25, "\ud83c\udf81", "Награда дня", var35, var14, var10, -13664328, null);
+             this.menuRowBar(var1, var22 != 0 ? 1.0F : Integer.bitCount(this.questClaimed & 7) / 3.0F, var22 != 0 ? -8592501 : -8395009, 3, 3);
              long var12 = System.currentTimeMillis();
              var12 = 86400000L - (var12 + (long)TimeZone.getDefault().getOffset(var12)) % 86400000L;
              this.tp.setTextAlign(Align.CENTER);
@@ -8937,6 +9009,16 @@ public class GameView extends View implements Runnable {
              float var2 = this.rowH;
              var2 = var3 + var2 * 4.0F + var2 * 0.4F;
              var1.drawText("Новые задания через " + var12 / 3600000L + "ч " + var12 / 60000L % 60L + "м", (float)this.W / 2.0F, var2, this.tp);
+             // weekly event scroll: framed card with gold ornaments and a slow shine
+             float menuEp = this.pad;
+             this.menuCell.set(menuEp * 1.5F, var2 + menuEp * 0.9F, (float)this.W - menuEp * 1.5F, Math.min((float)this.H - menuEp * 0.3F, var2 + menuEp * 6.0F));
+             this.menuCard(var1, this.menuCell, menuEp * 1.2F, -14411203, -11430, false, 7, false);
+             this.menuShine(var1, this.menuCell, menuEp * 1.2F, ((this.time * 0.22F) % 2.4F) / 1.0F, 70);
+             this.menuDiamond(var1, this.menuCell.left + menuEp * 1.3F, this.menuCell.centerY(), menuEp * 0.35F, menuAlpha(-11430, 210));
+             this.menuDiamond(var1, this.menuCell.right - menuEp * 1.3F, this.menuCell.centerY(), menuEp * 0.35F, menuAlpha(-11430, 210));
+             float menuSt = this.menuPulse(2.5F, 0.0F);
+             this.menuSpark(var1, this.menuCell.right - menuEp * 1.2F, this.menuCell.top + menuEp * 0.75F, Math.max(1.0F, menuEp * 0.2F), -11430, (int)(220.0F * menuSt));
+             this.menuSpark(var1, this.menuCell.left + menuEp * 1.2F, this.menuCell.bottom - menuEp * 0.75F, Math.max(1.0F, menuEp * 0.2F), -11430, (int)(220.0F * (1.0F - menuSt)));
              this.tp.setColor(-11430);
              this.tp.setTextSize(this.pad * 1.8F);
              this.tp.setFakeBoldText(true);
@@ -8944,7 +9026,9 @@ public class GameView extends View implements Runnable {
              var22 = this.W;
              float var4 = (float)var22 / 2.0F;
              var3 = this.pad;
+             this.tp.setShadowLayer(1.0F, 0.0F, var3 * 0.16F, 0xC0000000);
              this.drawFit(var1, var14, var4, 2.6F * var3 + var2, (float)var22 - var3 * 4.0F);
+             this.tp.clearShadowLayer();
              this.tp.setFakeBoldText(false);
              this.tp.setTextSize(this.pad * 1.5F);
              var14 = EVENT_DESC[this.eventIdx()] + " · серия входов: " + this.streak + " дн.";
@@ -9009,6 +9093,7 @@ public class GameView extends View implements Runnable {
           }
 
           this.rowBox(var1, var5, var9, var7, var17, var16, var15, var14, var10, -4158934, null);
+          this.menuRowBar(var1, var6 ? 1.0F : (var30[var8] > 0 ? (float)this.questProg(var5) / (float)var30[var8] : 0.0F), var6 ? -8592501 : (var11 ? -8592501 : var7), 4, var5);
           var5++;
        }
     }
@@ -9636,6 +9721,7 @@ public class GameView extends View implements Runnable {
     }
 
     void drawTab3(Canvas canvas) {
+        menuBackdrop(canvas);
         float f = this.pad;
         float f2 = DEATH_END * f;
         float f3 = (this.W - (f * 4.0f)) / 2.0f;
@@ -9648,10 +9734,23 @@ public class GameView extends View implements Runnable {
             float f6 = this.upT;
             rectF.set((f4 * 1.5f) + ((f3 + f4) * f5), f6, (1.5f * f4) + (f5 * (f4 + f3)) + f3, f6 + f2);
             boolean z = (i == 1) == this.bestiaryView;
-            this.p.setColor(z ? -11912576 : -14805453);
             RectF rectF2 = this.r;
             float f7 = this.pad;
-            canvas.drawRoundRect(rectF2, f7, f7, this.p);
+            menuCard(canvas, rectF2, f7, z ? -11912576 : -14805453, z ? -11430 : -11912576, false, 5, false);
+            if (z) {
+                // glowing selection underline
+                float pu = menuPulse(3.5f, 0.0f);
+                this.menuFill.setStyle(Paint.Style.FILL);
+                this.menuFill.setColor(menuAlpha(-11430, (int) (60.0f + 60.0f * pu)));
+                canvas.drawRect(rectF2.left + (f7 * 1.2f), rectF2.bottom - (f7 * 0.75f), rectF2.right - (f7 * 1.2f), rectF2.bottom - (f7 * 0.2f), this.menuFill);
+                this.menuFill.setColor(menuAlpha(-5720, (int) (170.0f + 85.0f * pu)));
+                canvas.drawRect(rectF2.left + (f7 * 2.0f), rectF2.bottom - (f7 * 0.6f), rectF2.right - (f7 * 2.0f), rectF2.bottom - (f7 * 0.35f), this.menuFill);
+                menuDiamond(canvas, rectF2.centerX(), rectF2.bottom - (f7 * 0.47f), f7 * 0.32f, -11430);
+            } else {
+                this.menuFill.setStyle(Paint.Style.FILL);
+                this.menuFill.setColor(0x40000000);
+                canvas.drawRoundRect(rectF2, f7, f7, this.menuFill);
+            }
             this.tp.setTextAlign(Paint.Align.CENTER);
             this.tp.setTextSize(this.pad * 1.6f);
             this.tp.setFakeBoldText(z);
@@ -9660,7 +9759,11 @@ public class GameView extends View implements Runnable {
             float centerX = this.r.centerX();
             float centerY = this.r.centerY();
             float f8 = this.pad;
+            if (z) {
+                this.tp.setShadowLayer(1.0f, 0.0f, f8 * 0.16f, 0xC0000000);
+            }
             drawFit(canvas, str, centerX, centerY + (0.55f * f8), f3 - f8);
+            this.tp.clearShadowLayer();
             this.tp.setFakeBoldText(false);
             i++;
         }
@@ -10033,7 +10136,441 @@ public class GameView extends View implements Runnable {
         this.tp.setFakeBoldText(false);
     }
 
+    // ===== gfx(menu): bottom panel lists — cached paints, shaders and helpers =====
+    static final int[] menuGlossC = {0x3CFFFFFF, 0x14FFFFFF, 0x00FFFFFF, 0x00000000, 0x4C000000};
+    static final float[] menuGlossP = {0f, 0.4f, 0.5f, 0.62f, 1f};
+    static final int[] menuShineC = {0x00FFFFFF, 0x50FFFFFF, 0xB4FFFFFF, 0x50FFFFFF, 0x00FFFFFF};
+    static final float[] menuShineP = {0f, 0.35f, 0.5f, 0.65f, 1f};
+    static final float[] menuGlowP = {0f, 0.45f, 1f};
+    final Paint menuFill = new Paint(1);
+    final Paint menuLine = new Paint(1);
+    final Paint menuSh = new Paint(1);
+    final Paint menuTexP = new Paint();
+    final RectF menuR = new RectF();
+    final RectF menuR2 = new RectF();
+    final RectF menuCell = new RectF();
+    final RectF menuArc = new RectF();
+    final RectF menuRow = new RectF();
+    final RectF menuFace = new RectF();
+    final Path menuPath = new Path();
+    final android.graphics.Matrix menuMtx = new android.graphics.Matrix();
+    final Shader[] menuGloss = new Shader[10];
+    final float[] menuGlossH = new float[10];
+    final Shader[] menuGlowSh = new Shader[48];
+    final int[] menuGlowCol = new int[48];
+    final float[] menuGlowRad = new float[48];
+    Shader menuShineSh;
+    Shader menuBgSh;
+    int menuBgBiome = -1;
+    float menuBgTop = -1f;
+    int menuBgH = -1;
+    Bitmap menuTexBmp;
+    Shader menuTexSh;
+    float menuTexKey = -1f;
+
+    static int menuMix(int a, int b, float t) {
+        if (!(t > 0f)) {
+            t = 0f;
+        } else if (t > 1f) {
+            t = 1f;
+        }
+        int aa = a >>> 24, ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+        int ba = b >>> 24, br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
+        int oa = (int) (aa + (ba - aa) * t);
+        int or = (int) (ar + (br - ar) * t);
+        int og = (int) (ag + (bg - ag) * t);
+        int ob = (int) (ab + (bb - ab) * t);
+        return (oa << 24) | (or << 16) | (og << 8) | ob;
+    }
+
+    static int menuAlpha(int c, int a) {
+        if (a < 0) {
+            a = 0;
+        } else if (a > 255) {
+            a = 255;
+        }
+        return (c & 0xFFFFFF) | (a << 24);
+    }
+
+    float menuPulse(float speed, float phase) {
+        return 0.5f + 0.5f * (float) Math.sin(this.time * speed + phase);
+    }
+
+    Shader menuGlossFor(int slot, float h) {
+        if (this.menuGloss[slot] == null || this.menuGlossH[slot] != h) {
+            this.menuGloss[slot] = new android.graphics.LinearGradient(0f, 0f, 0f, Math.max(1f, h), menuGlossC, menuGlossP, Shader.TileMode.CLAMP);
+            this.menuGlossH[slot] = h;
+        }
+        return this.menuGloss[slot];
+    }
+
+    // Vertical gloss (light top, dark bottom) over a rounded rect; shader cached per slot+height.
+    void menuGlossRR(Canvas c, RectF rr, float rad, int slot, int alpha) {
+        float h = rr.height();
+        if (!(h > 0f) || rr.width() <= 0f) {
+            return;
+        }
+        this.menuSh.setShader(menuGlossFor(slot, h));
+        this.menuSh.setAlpha(alpha);
+        c.save();
+        c.translate(0f, rr.top);
+        this.menuR2.set(rr.left, 0f, rr.right, h);
+        c.drawRoundRect(this.menuR2, rad, rad, this.menuSh);
+        c.restore();
+        this.menuSh.setShader(null);
+    }
+
+    void menuGlossCircle(Canvas c, float cx, float cy, float rad, int slot, int alpha) {
+        if (!(rad > 0f)) {
+            return;
+        }
+        this.menuSh.setShader(menuGlossFor(slot, rad * 2f));
+        this.menuSh.setAlpha(alpha);
+        c.save();
+        c.translate(0f, cy - rad);
+        c.drawCircle(cx, rad, rad, this.menuSh);
+        c.restore();
+        this.menuSh.setShader(null);
+    }
+
+    // Soft radial glow of a colour; shader cached per slot (colour + radius key).
+    void menuGlowAt(Canvas c, int slot, float cx, float cy, float rad, int color, int alpha) {
+        if (!(rad > 0f) || slot < 0 || slot >= this.menuGlowSh.length) {
+            return;
+        }
+        if (this.menuGlowSh[slot] == null || this.menuGlowCol[slot] != color || this.menuGlowRad[slot] != rad) {
+            this.menuGlowSh[slot] = new RadialGradient(0f, 0f, rad, new int[]{menuAlpha(color, 210), menuAlpha(color, 80), menuAlpha(color, 0)}, menuGlowP, Shader.TileMode.CLAMP);
+            this.menuGlowCol[slot] = color;
+            this.menuGlowRad[slot] = rad;
+        }
+        this.menuSh.setShader(this.menuGlowSh[slot]);
+        this.menuSh.setAlpha(alpha);
+        c.save();
+        c.translate(cx, cy);
+        c.drawCircle(0f, 0f, rad, this.menuSh);
+        c.restore();
+        this.menuSh.setShader(null);
+    }
+
+    // Diagonal light band sweeping across a rounded rect; phase 0..1 = left..right, outside = hidden.
+    void menuShine(Canvas c, RectF rr, float rad, float phase, int alpha) {
+        if (!(phase >= 0f) || phase > 1f) {
+            return;
+        }
+        float h = rr.height();
+        float w = rr.width();
+        if (h <= 0f || w <= 0f) {
+            return;
+        }
+        float sw = Math.max(this.pad * 2.2f, h * 0.8f);
+        if (this.menuShineSh == null) {
+            // unit-width band, stretched by the canvas scale below (built once)
+            this.menuShineSh = new android.graphics.LinearGradient(0f, 0f, 1f, 0f, menuShineC, menuShineP, Shader.TileMode.CLAMP);
+        }
+        float k = 0.5f;
+        this.menuPath.reset();
+        this.menuPath.addRoundRect(rr, rad, rad, Path.Direction.CW);
+        c.save();
+        c.clipPath(this.menuPath);
+        c.translate(rr.left - sw + phase * (w + sw + k * h), rr.top);
+        c.skew(-k, 0f);
+        c.scale(sw, 1f);
+        this.menuSh.setShader(this.menuShineSh);
+        this.menuSh.setAlpha(alpha);
+        c.drawRect(0f, 0f, 1f, h, this.menuSh);
+        this.menuSh.setShader(null);
+        c.restore();
+    }
+
+    // Pixel "plus" sparkle.
+    void menuSpark(Canvas c, float x, float y, float s, int color, int alpha) {
+        if (alpha <= 0 || !(s > 0f)) {
+            return;
+        }
+        this.menuFill.setStyle(Style.FILL);
+        this.menuFill.setColor(menuAlpha(color, alpha));
+        c.drawRect(x - s * 1.5f, y - s * 0.5f, x + s * 1.5f, y + s * 0.5f, this.menuFill);
+        c.drawRect(x - s * 0.5f, y - s * 1.5f, x + s * 0.5f, y + s * 1.5f, this.menuFill);
+        this.menuFill.setColor(menuAlpha(-1, alpha));
+        c.drawRect(x - s * 0.5f, y - s * 0.5f, x + s * 0.5f, y + s * 0.5f, this.menuFill);
+    }
+
+    // Small 45-degree diamond ornament.
+    void menuDiamond(Canvas c, float x, float y, float s, int color) {
+        this.menuFill.setStyle(Style.FILL);
+        this.menuFill.setColor(color);
+        c.save();
+        c.translate(x, y);
+        c.rotate(45f);
+        c.drawRect(-s, -s, s, s, this.menuFill);
+        this.menuFill.setColor(menuAlpha(-1, (color >>> 24) / 2));
+        c.drawRect(-s, -s, 0f, 0f, this.menuFill);
+        c.restore();
+    }
+
+    // Card: drop shadow, optional pulsing glow, tinted base, gloss, accent strip, bevel border.
+    void menuCard(Canvas c, RectF rr, float rad, int base, int accent, boolean hot, int slot, boolean strip) {
+        if (rr.width() <= 0f || rr.height() <= 0f) {
+            return;
+        }
+        float pd = this.pad;
+        this.menuFill.setStyle(Style.FILL);
+        this.menuFill.setColor(0x70000000);
+        this.menuR.set(rr.left + pd * 0.12f, rr.top + pd * 0.4f, rr.right + pd * 0.12f, rr.bottom + pd * 0.45f);
+        c.drawRoundRect(this.menuR, rad, rad, this.menuFill);
+        this.menuFill.setColor(0x38000000);
+        this.menuR.set(rr.left - pd * 0.1f, rr.top + pd * 0.15f, rr.right + pd * 0.3f, rr.bottom + pd * 0.75f);
+        c.drawRoundRect(this.menuR, rad * 1.2f, rad * 1.2f, this.menuFill);
+        this.menuLine.setStyle(Style.STROKE);
+        if (hot) {
+            float pu = menuPulse(5.5f, 0f);
+            int glow = menuMix(accent, -1, 0.25f);
+            this.menuLine.setStrokeWidth(pd * 0.55f);
+            this.menuLine.setColor(menuAlpha(glow, (int) (35f + 45f * pu)));
+            this.menuR.set(rr.left - pd * 0.4f, rr.top - pd * 0.4f, rr.right + pd * 0.4f, rr.bottom + pd * 0.4f);
+            c.drawRoundRect(this.menuR, rad + pd * 0.4f, rad + pd * 0.4f, this.menuLine);
+            this.menuLine.setStrokeWidth(pd * 0.25f);
+            this.menuLine.setColor(menuAlpha(glow, (int) (90f + 110f * pu)));
+            this.menuR.set(rr.left - pd * 0.14f, rr.top - pd * 0.14f, rr.right + pd * 0.14f, rr.bottom + pd * 0.14f);
+            c.drawRoundRect(this.menuR, rad + pd * 0.14f, rad + pd * 0.14f, this.menuLine);
+        }
+        this.menuFill.setColor(menuMix(base, accent, hot ? 0.16f : 0.09f));
+        c.drawRoundRect(rr, rad, rad, this.menuFill);
+        menuGlossRR(c, rr, rad, slot, 255);
+        if (strip) {
+            this.menuPath.reset();
+            this.menuPath.addRoundRect(rr, rad, rad, Path.Direction.CW);
+            c.save();
+            c.clipPath(this.menuPath);
+            this.menuFill.setColor(menuAlpha(accent, 200));
+            c.drawRect(rr.left, rr.top, rr.left + pd * 0.5f, rr.bottom, this.menuFill);
+            this.menuFill.setColor(menuAlpha(menuMix(accent, -1, 0.5f), 150));
+            c.drawRect(rr.left, rr.top, rr.left + pd * 0.5f, rr.top + pd * 0.35f, this.menuFill);
+            this.menuFill.setColor(0x40000000);
+            c.drawRect(rr.left + pd * 0.5f, rr.top, rr.left + pd * 0.7f, rr.bottom, this.menuFill);
+            c.restore();
+        }
+        float sw = Math.max(1f, pd * 0.14f);
+        this.menuLine.setStrokeWidth(sw);
+        this.menuLine.setColor(hot ? menuMix(accent, -1, 0.35f) : menuAlpha(menuMix(base, -1, 0.22f), 210));
+        this.menuR.set(rr.left + sw * 0.5f, rr.top + sw * 0.5f, rr.right - sw * 0.5f, rr.bottom - sw * 0.5f);
+        c.drawRoundRect(this.menuR, rad, rad, this.menuLine);
+        float hl = Math.max(1f, this.hu * 0.3f);
+        this.menuFill.setColor(0x34FFFFFF);
+        c.drawRect(rr.left + rad, rr.top + sw + hl * 0.5f, rr.right - rad, rr.top + sw + hl * 1.5f, this.menuFill);
+        this.menuFill.setColor(0x30000000);
+        c.drawRect(rr.left + rad, rr.bottom - sw - hl * 1.5f, rr.right - rad, rr.bottom - sw - hl * 0.5f, this.menuFill);
+        // pixel rivets in the right corners
+        float rv = Math.max(1f, pd * 0.28f);
+        this.menuFill.setColor(menuAlpha(menuMix(accent, -1, 0.3f), 120));
+        c.drawRect(rr.right - rad * 0.9f - rv, rr.top + rad * 0.9f - rv, rr.right - rad * 0.9f, rr.top + rad * 0.9f, this.menuFill);
+        c.drawRect(rr.right - rad * 0.9f - rv, rr.bottom - rad * 0.9f, rr.right - rad * 0.9f, rr.bottom - rad * 0.9f + rv, this.menuFill);
+    }
+
+    // Raised 3D buy button: shadow, darker lip, glossy face, glow + shine when affordable, gold when maxed.
+    void menuButton(Canvas c, RectF b, float rad, int col, boolean on, boolean maxed, int idx) {
+        if (b.width() <= 0f || b.height() <= 0f) {
+            return;
+        }
+        float pd = this.pad;
+        float lip = pd * 0.32f;
+        this.menuFill.setStyle(Style.FILL);
+        this.menuFill.setColor(0x80000000);
+        this.menuR.set(b.left, b.top + pd * 0.3f, b.right, b.bottom + pd * 0.35f);
+        c.drawRoundRect(this.menuR, rad, rad, this.menuFill);
+        this.menuLine.setStyle(Style.STROKE);
+        if (on) {
+            float pu = menuPulse(6f, idx * 0.9f);
+            this.menuLine.setStrokeWidth(pd * 0.45f);
+            this.menuLine.setColor(menuAlpha(menuMix(col, -1, 0.4f), (int) (40f + 70f * pu)));
+            this.menuR.set(b.left - pd * 0.3f, b.top - pd * 0.3f, b.right + pd * 0.3f, b.bottom + pd * 0.3f);
+            c.drawRoundRect(this.menuR, rad + pd * 0.3f, rad + pd * 0.3f, this.menuLine);
+        }
+        this.menuFill.setColor(menuMix(col, 0xFF000000, 0.42f));
+        c.drawRoundRect(b, rad, rad, this.menuFill);
+        this.menuFace.set(b.left, b.top, b.right, b.bottom - lip);
+        RectF face = this.menuFace;
+        this.menuFill.setColor(on ? menuMix(col, -1, 0.06f * menuPulse(6f, idx * 0.9f)) : col);
+        c.drawRoundRect(face, rad, rad, this.menuFill);
+        menuGlossRR(c, face, rad, 1, on ? 255 : 150);
+        float sw = Math.max(1f, pd * 0.14f);
+        this.menuLine.setStrokeWidth(sw);
+        int border = maxed ? menuAlpha(-11430, (int) (150f + 100f * menuPulse(3f, 0f))) : (on ? menuMix(col, -1, 0.5f) : menuMix(col, -1, 0.14f));
+        this.menuR.set(b.left + sw * 0.5f, b.top + sw * 0.5f, b.right - sw * 0.5f, b.bottom - sw * 0.5f);
+        c.drawRoundRect(this.menuR, rad, rad, this.menuLine);
+        float hl = Math.max(1f, this.hu * 0.3f);
+        this.menuFill.setColor(on ? 0x55FFFFFF : 0x22FFFFFF);
+        c.drawRect(face.left + rad * 0.8f, face.top + sw + hl * 0.4f, face.right - rad * 0.8f, face.top + sw + hl * 1.4f, this.menuFill);
+        if (on) {
+            float ph = ((this.time * 0.55f + idx * 0.27f) % 1.9f) / 1.1f;
+            menuShine(c, face, rad, ph, 230);
+        }
+        if (maxed) {
+            for (int k = 0; k < 3; k++) {
+                float tw = (float) Math.sin(this.time * 3.2f + k * 2.1f + idx);
+                if (tw > 0.2f) {
+                    float sx = k == 0 ? b.left + rad * 0.9f : (k == 1 ? b.right - rad * 0.9f : b.centerX() + b.width() * 0.32f);
+                    float sy = k == 2 ? b.bottom - lip - rad * 0.6f : b.top + rad * 0.7f;
+                    menuSpark(c, sx, sy, Math.max(1f, pd * 0.22f), -11430, (int) (255f * (tw - 0.2f) / 0.8f));
+                }
+            }
+        }
+    }
+
+    // Progress bar with gradient fill, tick marks, a pulsing leading edge and a shine when full.
+    void menuBar(Canvas c, float x0, float y0, float x1, float y1, float frac, int color, int ticks, int idx) {
+        if (!(x1 > x0) || !(y1 > y0)) {
+            return;
+        }
+        if (!(frac > 0f)) {
+            frac = 0f;
+        } else if (frac > 1f) {
+            frac = 1f;
+        }
+        float pd = this.pad;
+        float rad = (y1 - y0) * 0.5f;
+        float sw = Math.max(1f, this.hu * 0.25f);
+        this.menuFill.setStyle(Style.FILL);
+        this.menuFill.setColor(0x8C000000);
+        this.menuR.set(x0 - sw, y0 - sw, x1 + sw, y1 + sw);
+        c.drawRoundRect(this.menuR, rad + sw, rad + sw, this.menuFill);
+        if (frac > 0f) {
+            float fx = x0 + Math.max(rad * 2f, (x1 - x0) * frac);
+            if (fx > x1) {
+                fx = x1;
+            }
+            this.menuFill.setColor(menuMix(color, 0xFF000000, 0.25f));
+            this.menuR.set(x0, y0, fx, y1);
+            c.drawRoundRect(this.menuR, rad, rad, this.menuFill);
+            this.menuFill.setColor(color);
+            this.menuR.set(x0, y0, fx, y1 - (y1 - y0) * 0.3f);
+            c.drawRoundRect(this.menuR, rad, rad, this.menuFill);
+            this.menuR.set(x0, y0, fx, y1);
+            menuGlossRR(c, this.menuR, rad, 4, 255);
+            if (frac < 1f) {
+                this.menuFill.setColor(menuAlpha(-1, (int) (90f + 150f * menuPulse(7f, idx))));
+                c.drawRect(fx - Math.max(1f, this.hu * 0.4f), y0, fx, y1, this.menuFill);
+            } else {
+                menuShine(c, this.menuR, rad, ((this.time * 0.45f + idx * 0.31f) % 1.6f) / 1.0f, 255);
+            }
+        }
+        if (ticks > 1) {
+            this.menuFill.setColor(0x70000000);
+            float tw = Math.max(1f, this.hu * 0.22f);
+            for (int t = 1; t < ticks; t++) {
+                float tx = x0 + (x1 - x0) * t / ticks;
+                c.drawRect(tx - tw * 0.5f, y0, tx + tw * 0.5f, y1, this.menuFill);
+            }
+        }
+        this.menuLine.setStyle(Style.STROKE);
+        this.menuLine.setStrokeWidth(sw);
+        this.menuLine.setColor(0x38FFFFFF);
+        this.menuR.set(x0 - sw * 0.5f, y0 - sw * 0.5f, x1 + sw * 0.5f, y1 + sw * 0.5f);
+        c.drawRoundRect(this.menuR, rad + sw * 0.5f, rad + sw * 0.5f, this.menuLine);
+    }
+
+    // Bar along the bottom of the last rowBox card (menuRow holds the card, this.btn the buy button).
+    void menuRowBar(Canvas c, float frac, int color, int ticks, int idx) {
+        float pd = this.pad;
+        float cy = this.menuRow.centerY();
+        float y1 = this.menuRow.bottom - pd * 0.55f;
+        float y0 = y1 - pd * 0.42f;
+        if (y0 < cy + pd * 2.25f) {
+            return;
+        }
+        menuBar(c, pd * 8.5f, y0, this.btn.left - pd * 1.4f, y1, frac, menuMix(color, -1, 0.15f), ticks, idx);
+    }
+
+    // Panel backdrop: biome-tinted gradient, pixel brick texture, ornament divider and drifting motes.
+    void menuBackdrop(Canvas c) {
+        if (this.W <= 0 || this.H <= 0) {
+            return;
+        }
+        float pd = this.pad;
+        float top = this.upT - pd * 0.25f;
+        float bot = this.H;
+        if (!(bot > top)) {
+            return;
+        }
+        int b = biome();
+        if (this.menuBgSh == null || this.menuBgBiome != b || this.menuBgTop != top || this.menuBgH != this.H) {
+            int tint = b == 0 ? 0xFF1C3A38 : (b == 1 ? 0xFF3E2C1A : 0xFF28224E);
+            this.menuBgSh = new android.graphics.LinearGradient(0f, top, 0f, bot,
+                new int[]{menuMix(-15594462, tint, 0.55f), menuMix(-15594462, tint, 0.18f), menuMix(-15594462, 0xFF000000, 0.45f)},
+                new float[]{0f, 0.3f, 1f}, Shader.TileMode.CLAMP);
+            this.menuBgBiome = b;
+            this.menuBgTop = top;
+            this.menuBgH = this.H;
+        }
+        this.menuSh.setShader(this.menuBgSh);
+        this.menuSh.setAlpha(255);
+        c.drawRect(0f, top, this.W, bot, this.menuSh);
+        this.menuSh.setShader(null);
+        float hs = Math.max(1f, this.hu);
+        if (this.menuTexSh == null || this.menuTexKey != hs) {
+            if (this.menuTexBmp == null) {
+                int[] px = new int[64];
+                for (int y = 0; y < 8; y++) {
+                    for (int x = 0; x < 8; x++) {
+                        int v = 0;
+                        if (y == 0 || y == 4) {
+                            v = 0x26000000;
+                        } else if ((y < 4 && x == 0) || (y > 4 && x == 4)) {
+                            v = 0x22000000;
+                        } else if (y == 1 || y == 5) {
+                            v = 0x0CFFFFFF;
+                        } else if (((x * 5 + y * 3) % 11) == 0) {
+                            v = 0x0AFFFFFF;
+                        }
+                        px[y * 8 + x] = v;
+                    }
+                }
+                this.menuTexBmp = Bitmap.createBitmap(px, 8, 8, Bitmap.Config.ARGB_8888);
+            }
+            android.graphics.BitmapShader bs = new android.graphics.BitmapShader(this.menuTexBmp, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
+            this.menuMtx.setScale(hs, hs);
+            bs.setLocalMatrix(this.menuMtx);
+            this.menuTexSh = bs;
+            this.menuTexKey = hs;
+        }
+        this.menuTexP.setShader(this.menuTexSh);
+        this.menuTexP.setFilterBitmap(false);
+        c.drawRect(0f, top, this.W, bot, this.menuTexP);
+        // stepped-fade gold divider under the tabs
+        float ly = this.upT - pd * 0.45f;
+        float lh = Math.max(1f, pd * 0.16f);
+        float cx = this.W * 0.5f;
+        int gold = -11430;
+        this.menuFill.setStyle(Style.FILL);
+        this.menuFill.setColor(menuAlpha(gold, 34));
+        c.drawRect(cx - this.W * 0.46f, ly, cx + this.W * 0.46f, ly + lh, this.menuFill);
+        this.menuFill.setColor(menuAlpha(gold, 60));
+        c.drawRect(cx - this.W * 0.33f, ly, cx + this.W * 0.33f, ly + lh, this.menuFill);
+        this.menuFill.setColor(menuAlpha(gold, 105));
+        c.drawRect(cx - this.W * 0.18f, ly, cx + this.W * 0.18f, ly + lh, this.menuFill);
+        menuDiamond(c, cx, ly + lh * 0.5f, pd * 0.42f, menuAlpha(gold, 200));
+        menuDiamond(c, cx - this.W * 0.2f, ly + lh * 0.5f, pd * 0.2f, menuAlpha(gold, 120));
+        menuDiamond(c, cx + this.W * 0.2f, ly + lh * 0.5f, pd * 0.2f, menuAlpha(gold, 120));
+        // drifting motes (biome tinted)
+        int mote = b == 0 ? 0xFFB8FFC8 : (b == 1 ? 0xFFFFD890 : 0xFFC8B8FF);
+        float span = bot - top;
+        for (int k = 0; k < 12; k++) {
+            float sp = 0.03f + 0.025f * (((k * 37) % 10) / 10f);
+            float ph = (this.time * sp + k * 0.137f) % 1f;
+            if (ph < 0f) {
+                ph += 1f;
+            }
+            float my = bot - ph * span;
+            float mx = ((k * 0.618034f + 0.11f) % 1f) * this.W + (float) Math.sin(this.time * 0.8f + k * 1.7f) * pd * 0.9f;
+            int a = (int) (85f * Math.sin(ph * Math.PI));
+            float ms = hs * (0.45f + (k % 3) * 0.2f);
+            this.menuFill.setColor(menuAlpha(mote, a));
+            c.drawRect(mx, my, mx + ms, my + ms, this.menuFill);
+        }
+    }
+
     void drawUpgrades(Canvas canvas) {
+        menuBackdrop(canvas);
         int i = OV_NONE;
         while (i < 5) {
             double[] batch = batch(i);
@@ -10049,6 +10586,8 @@ public class GameView extends View implements Runnable {
             String fmt = fmt(batch[1]);
             boolean z3 = UP_MANA[i];
             rowBox(canvas, i, z2, i3, valueOf, str2, effect, fmt, z, z3 ? -9809960 : -12673970, z3 ? this.bmMana : this.bmCoin, str);
+            // progress to the next x2 milestone (every 25 levels)
+            menuRowBar(canvas, (this.lvl[i] % 25) / 25.0f, i3, 5, i);
             i++;
         }
     }
@@ -11592,6 +12131,8 @@ public class GameView extends View implements Runnable {
     void rowBox(
        Canvas var1, int var2, boolean var3, int var4, String var5, String var6, String var7, String var8, boolean var9, int var10, Bitmap var11, String var12
     ) {
+       int menuIdx = var2;
+       int menuSlot = Math.max(0, Math.min(3, this.tab)) * 12 + Math.max(0, Math.min(11, var2));
        float var15 = this.upT;
        float var13 = (float)var2;
        float var14 = this.rowH;
@@ -11599,6 +12140,7 @@ public class GameView extends View implements Runnable {
        var15 = this.pad;
        var14 = var14 + var13 - 0.7F * var15;
        this.r.set(var15 * 1.5F, var13, (float)this.W - var15 * 1.5F, var14);
+       this.menuRow.set(this.r);
        RectF var20 = this.r;
        var15 = this.pad;
        if (var3) {
@@ -11607,18 +12149,39 @@ public class GameView extends View implements Runnable {
           var2 = -14411203;
        }
 
-       this.panel(var1, var20, var15 * 1.2F, var2);
+       this.menuCard(var1, var20, var15 * 1.2F, var2, var4, var3, 0, true);
        float var16 = this.pad * 5.0F;
        var15 = (var13 + var14) / 2.0F;
        if (this.rowIcon != null) {
           float var17 = this.rowH * 0.3F;
-          this.p.setColor(var4);
-          this.p.setAlpha(55);
-          var1.drawCircle(var16, var15, var17, this.p);
-          this.p.setAlpha(255);
+          // medallion: soft glow, rotating rays when affordable, dark disc and ring
+          float menuPu = this.menuPulse(3.0F, menuIdx * 1.3F);
+          this.menuGlowAt(var1, menuSlot, var16, var15, var17 * 1.55F, var4, var9 ? (int)(150.0F + 90.0F * menuPu) : 110);
+          if (var9) {
+             this.menuFill.setStyle(Style.FILL);
+             this.menuFill.setColor(menuAlpha(menuMix(var4, -1, 0.45F), 46));
+             float menuRr = var17 * 1.5F;
+             this.menuArc.set(var16 - menuRr, var15 - menuRr, var16 + menuRr, var15 + menuRr);
+             for (int menuK = 0; menuK < 6; menuK++) {
+                var1.drawArc(this.menuArc, this.time * 28.0F + menuK * 60.0F + menuIdx * 17.0F, 13.0F, true, this.menuFill);
+             }
+          }
+          this.menuFill.setStyle(Style.FILL);
+          this.menuFill.setColor(menuAlpha(menuMix(var4, 0xFF000000, 0.62F), 190));
+          var1.drawCircle(var16, var15, var17 * 0.95F, this.menuFill);
+          this.menuGlossCircle(var1, var16, var15, var17 * 0.95F, 3, 150);
+          this.menuLine.setStyle(Style.STROKE);
+          this.menuLine.setStrokeWidth(Math.max(1.0F, this.pad * 0.16F));
+          this.menuLine.setColor(menuAlpha(menuMix(var4, -1, 0.2F), var9 ? 230 : 150));
+          var1.drawCircle(var16, var15, var17 * 0.95F, this.menuLine);
           float var18 = 1.75F * var17 / (float)this.rowIcon.getWidth();
           Bitmap var53 = this.rowIcon;
-          this.blit(var1, var53, var16, (float)var53.getHeight() * var18 / 2.0F + var15 - 0.12F * var17, var18, 1.0F, 1.0F, this.bp);
+          float menuBob = var9 ? (float)Math.sin(this.time * 3.2F + menuIdx * 0.8F) * this.pad * 0.2F : 0.0F;
+          // tiny ground shadow under the icon
+          this.menuFill.setColor(0x50000000);
+          this.menuArc.set(var16 - var17 * 0.55F, var15 + var17 * 0.48F, var16 + var17 * 0.55F, var15 + var17 * 0.68F);
+          var1.drawOval(this.menuArc, this.menuFill);
+          this.blit(var1, var53, var16, (float)var53.getHeight() * var18 / 2.0F + var15 - 0.12F * var17 + menuBob, var18, 1.0F, 1.0F, this.bp);
           this.tp.setTypeface(this.pixTf);
           this.tp.setFakeBoldText(false);
           this.tp.setTextSize(this.pad * 1.05F);
@@ -11627,26 +12190,48 @@ public class GameView extends View implements Runnable {
           var18 /= 2.0F;
           var17 = var15 + 0.55F * var17;
           var20.set(var16 - var18, var17, var18 + var16, this.pad * 1.7F + var17);
-          this.p.setColor(-15331286);
-          var20 = this.pr;
-          var16 = this.pad;
-          var1.drawRoundRect(var20, var16 * 0.6F, var16 * 0.6F, this.p);
-          this.p.setColor(var4);
-          this.p.setStyle(Style.STROKE);
-          this.p.setStrokeWidth(this.pad * 0.18F);
-          var20 = this.pr;
-          var16 = this.pad;
-          var1.drawRoundRect(var20, var16 * 0.6F, var16 * 0.6F, this.p);
-          this.p.setStyle(Style.FILL);
+          // level badge: shadowed glossy pill with coloured rim
+          this.menuFill.setColor(0x80000000);
+          this.menuArc.set(this.pr.left, this.pr.top + this.pad * 0.25F, this.pr.right, this.pr.bottom + this.pad * 0.25F);
+          var1.drawRoundRect(this.menuArc, this.pad * 0.6F, this.pad * 0.6F, this.menuFill);
+          this.menuFill.setColor(menuMix(-15331286, var4, 0.22F));
+          var1.drawRoundRect(this.pr, this.pad * 0.6F, this.pad * 0.6F, this.menuFill);
+          this.menuGlossRR(var1, this.pr, this.pad * 0.6F, 2, 220);
+          this.menuLine.setStrokeWidth(this.pad * 0.18F);
+          this.menuLine.setColor(var9 ? menuMix(var4, -1, 0.3F) : var4);
+          var1.drawRoundRect(this.pr, this.pad * 0.6F, this.pad * 0.6F, this.menuLine);
           this.tp.setTextAlign(Align.CENTER);
           this.tp.setColor(-1);
+          this.tp.setShadowLayer(1.0F, 0.0F, this.pad * 0.14F, 0xE0000000);
           var1.drawText(var5, this.pr.centerX(), this.pr.centerY() + this.pad * 0.5F, this.tp);
+          this.tp.clearShadowLayer();
           this.tp.setTypeface(Typeface.DEFAULT);
           this.tp.setFakeBoldText(true);
           this.rowIcon = null;
        } else {
-          this.p.setColor(var4);
-          var1.drawCircle(var16, var15, this.rowH * 0.28F, this.p);
+          float menuRc = this.rowH * 0.28F;
+          boolean menuLive = var9 || var3;
+          this.menuGlowAt(var1, menuSlot, var16, var15, menuRc * 1.6F, var4, menuLive ? (int)(140.0F + 100.0F * this.menuPulse(4.0F, menuIdx)) : 90);
+          if (menuLive) {
+             // radar ping ring
+             float menuPh = (this.time * 0.9F + menuIdx * 0.33F) % 1.0F;
+             this.menuLine.setStyle(Style.STROKE);
+             this.menuLine.setStrokeWidth(Math.max(1.0F, this.pad * 0.2F));
+             this.menuLine.setColor(menuAlpha(menuMix(var4, -1, 0.4F), (int)(200.0F * (1.0F - menuPh))));
+             var1.drawCircle(var16, var15, menuRc * (1.0F + 0.55F * menuPh), this.menuLine);
+          }
+          this.menuFill.setStyle(Style.FILL);
+          this.menuFill.setColor(0x60000000);
+          var1.drawCircle(var16, var15 + this.pad * 0.3F, menuRc, this.menuFill);
+          this.menuFill.setColor(menuMix(var4, 0xFF000000, 0.3F));
+          var1.drawCircle(var16, var15, menuRc, this.menuFill);
+          this.menuFill.setColor(var4);
+          var1.drawCircle(var16, var15 - menuRc * 0.08F, menuRc * 0.9F, this.menuFill);
+          this.menuGlossCircle(var1, var16, var15, menuRc, 8, 255);
+          this.menuLine.setStyle(Style.STROKE);
+          this.menuLine.setStrokeWidth(Math.max(1.0F, this.pad * 0.16F));
+          this.menuLine.setColor(menuAlpha(menuMix(var4, -1, 0.55F), 200));
+          var1.drawCircle(var16, var15, menuRc, this.menuLine);
           this.tp.setTextAlign(Align.CENTER);
           this.tp.setColor(-15069136);
           this.tp.setTextSize(this.rowH * 0.26F);
@@ -11658,7 +12243,9 @@ public class GameView extends View implements Runnable {
        this.tp.setColor(-1);
        this.tp.setTextSize(this.pad * 1.9F);
        var16 = this.pad;
+       this.tp.setShadowLayer(1.0F, 0.0F, var16 * 0.16F, 0xC0000000);
        this.drawFit(var1, var6, var16 * 8.5F, var15 - var16 * 0.3F, (float)this.W * 0.5F);
+       this.tp.clearShadowLayer();
        this.tp.setFakeBoldText(false);
        this.tp.setColor(-5728052);
        this.tp.setTextSize(this.pad * 1.45F);
@@ -11676,7 +12263,7 @@ public class GameView extends View implements Runnable {
           var10 = -12963760;
        }
 
-       this.panel(var1, var27, var13, var10);
+       this.menuButton(var1, var27, var13, var10, var9, "МАКС".equals(var8), menuIdx);
        var13 = this.btn.centerY();
        var14 = this.pad;
        byte var25 = -1;
@@ -11702,6 +12289,8 @@ public class GameView extends View implements Runnable {
        Paint var29 = this.tp;
        if (var9) {
           var2 = var25;
+       } else if ("МАКС".equals(var8)) {
+          var2 = -11430;
        } else {
           var2 = -7569238;
        }
@@ -11709,6 +12298,9 @@ public class GameView extends View implements Runnable {
        var29.setColor(var2);
        this.tp.setTextSize(this.pad * 1.8F);
        this.tp.setFakeBoldText(true);
+       if (var9) {
+          this.tp.setShadowLayer(1.0F, 0.0F, this.pad * 0.16F, 0xB0000000);
+       }
        if (var11 != null) {
           float var52 = this.pad * 0.24F;
           var48 = Math.min(this.tp.measureText(var8), var15 - this.pad * 4.0F);
@@ -11721,6 +12313,7 @@ public class GameView extends View implements Runnable {
           this.drawFit(var1, var8, this.btn.centerX(), var13, var15 - this.pad);
        }
 
+       this.tp.clearShadowLayer();
        this.tp.setFakeBoldText(false);
     }
 
