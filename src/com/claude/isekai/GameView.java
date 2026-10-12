@@ -1975,56 +1975,417 @@ public class GameView extends View implements Runnable {
         }
     }
 
+    // ===== hud: HUD & battle-button rendering helpers (visual only) =====
+    final Paint hudFill = new Paint(1);
+    final Paint hudShadeP = new Paint(1);
+    final Paint hudLine = new Paint(1);
+    final RectF hudR = new RectF();
+    final RectF hudR2 = new RectF();
+    final RectF hudBtnR = new RectF();
+    final Path hudPath = new Path();
+    final Path hudClip = new Path();
+    final Shader[] hudShadeC = new Shader[12];
+    final float[] hudShadeK = new float[24];
+    int hudShadeN;
+    Shader hudHeadSh;
+    Shader hudHeadDropSh;
+    float hudHeadKey = -1.0f;
+    float hudHeadKeyPad = -1.0f;
+    int hudHeadBiome = -1;
+    final Shader[] hudGlowSh = new Shader[3];
+    float hudGlowKey = -1.0f;
+    Shader hudGaugeSh;
+    float hudGaugeK0 = -1.0f;
+    float hudGaugeK1 = -1.0f;
+    Shader hudBandSh;
+    float hudBandK0 = -1.0f;
+    float hudBandK1 = -1.0f;
+    boolean hudBandTower;
+    float hudTabX = -1.0f;
+    float hudTabLast = -1.0f;
+    double hudLastSouls = -1.0d;
+    float hudSoulPulse;
+    float hudPulseLast = -1.0f;
+
+    static int hudMix(int i, int i2, float f) {
+        float f2 = f < 0.0f ? 0.0f : f > 1.0f ? 1.0f : f;
+        int a = (int) (((i >>> 24) & 255) + ((((i2 >>> 24) & 255) - ((i >>> 24) & 255)) * f2));
+        int r = (int) (((i >> 16) & 255) + ((((i2 >> 16) & 255) - ((i >> 16) & 255)) * f2));
+        int g = (int) (((i >> 8) & 255) + ((((i2 >> 8) & 255) - ((i >> 8) & 255)) * f2));
+        int b = (int) ((i & 255) + (((i2 & 255) - (i & 255)) * f2));
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
+    static int hudBiomeTint(int i) {
+        return i == 2 ? -38342 : i == 1 ? -7680769 : -9844646;
+    }
+
+    /** Cached vertical bevel overlay (light top, dark bottom) for a given vertical span. */
+    Shader hudShade(float f, float f2) {
+        for (int i = 0; i < this.hudShadeC.length; i++) {
+            if (this.hudShadeC[i] != null && this.hudShadeK[i * 2] == f && this.hudShadeK[(i * 2) + 1] == f2) {
+                return this.hudShadeC[i];
+            }
+        }
+        int i2 = this.hudShadeN;
+        this.hudShadeN = (i2 + 1) % this.hudShadeC.length;
+        float f3 = f2 <= f ? f + 1.0f : f2;
+        this.hudShadeC[i2] = new android.graphics.LinearGradient(0.0f, f, 0.0f, f3, new int[]{1728053247, 335544319, 0, 1291845632}, new float[]{0.0f, 0.42f, 0.6f, 1.0f}, Shader.TileMode.CLAMP);
+        this.hudShadeK[i2 * 2] = f;
+        this.hudShadeK[(i2 * 2) + 1] = f2;
+        return this.hudShadeC[i2];
+    }
+
+    /** Beveled pixel panel: two-step drop shadow, body, gradient bevel, light top lip, dark bottom lip, dark outline. */
+    void hudPanel(Canvas canvas, RectF rectF, float f, int i) {
+        if (rectF.width() <= 0.0f || rectF.height() <= 0.0f) {
+            return;
+        }
+        int alpha = Color.alpha(i);
+        float f2 = this.pad;
+        this.hudFill.setShader(null);
+        this.hudFill.setStyle(Paint.Style.FILL);
+        this.hudFill.setColor(-16777216);
+        this.hudFill.setAlpha((alpha * 55) / 255);
+        this.hudR.set(rectF.left + (0.15f * f2), rectF.top + (0.6f * f2), rectF.right + (0.15f * f2), rectF.bottom + (0.75f * f2));
+        float f3 = f * 1.15f;
+        canvas.drawRoundRect(this.hudR, f3, f3, this.hudFill);
+        this.hudFill.setAlpha((alpha * 120) / 255);
+        this.hudR.set(rectF.left, rectF.top + (0.3f * f2), rectF.right, rectF.bottom + (0.35f * f2));
+        canvas.drawRoundRect(this.hudR, f, f, this.hudFill);
+        this.hudFill.setColor(i);
+        canvas.drawRoundRect(rectF, f, f, this.hudFill);
+        this.hudShadeP.setShader(hudShade(rectF.top, rectF.bottom));
+        this.hudShadeP.setAlpha(alpha);
+        canvas.drawRoundRect(rectF, f, f, this.hudShadeP);
+        float f4 = 0.75f * f;
+        this.hudFill.setColor(-1);
+        this.hudFill.setAlpha((alpha * 85) / 255);
+        this.hudR.set(rectF.left + f4, rectF.top + (0.16f * f2), rectF.right - f4, rectF.top + (0.4f * f2));
+        canvas.drawRect(this.hudR, this.hudFill);
+        this.hudFill.setColor(-16777216);
+        this.hudFill.setAlpha((alpha * 75) / 255);
+        this.hudR.set(rectF.left + f4, rectF.bottom - (0.42f * f2), rectF.right - f4, rectF.bottom - (0.16f * f2));
+        canvas.drawRect(this.hudR, this.hudFill);
+        this.hudLine.setStyle(Paint.Style.STROKE);
+        this.hudLine.setStrokeWidth(Math.max(1.0f, 0.2f * f2));
+        this.hudLine.setColor(hudMix(i, -16777216, 0.6f));
+        this.hudLine.setAlpha(Math.min(255, alpha + 30));
+        canvas.drawRoundRect(rectF, f, f, this.hudLine);
+    }
+
+    /** Soft stepped outer glow around a rect (strength 0..1). */
+    void hudGlow(Canvas canvas, RectF rectF, float f, int i, float f2) {
+        if (f2 <= 0.01f) {
+            return;
+        }
+        float f3 = this.pad;
+        this.hudLine.setStyle(Paint.Style.STROKE);
+        this.hudLine.setStrokeWidth(0.5f * f3);
+        for (int i2 = 0; i2 < 3; i2++) {
+            float f4 = ((i2 * 0.5f) + 0.3f) * f3;
+            this.hudLine.setColor(i);
+            this.hudLine.setAlpha((int) (Math.min(1.0f, f2) * (150 - (i2 * 50))));
+            this.hudR2.set(rectF.left - f4, rectF.top - f4, rectF.right + f4, rectF.bottom + f4);
+            float f5 = f + f4;
+            canvas.drawRoundRect(this.hudR2, f5, f5, this.hudLine);
+        }
+    }
+
+    /** Expanding fading ring (phase wraps 0..1). */
+    void hudPing(Canvas canvas, RectF rectF, float f, int i, float f2) {
+        float f3 = f2 - ((float) Math.floor(f2));
+        float f4 = this.pad * ((1.8f * f3) + 0.2f);
+        this.hudLine.setStyle(Paint.Style.STROKE);
+        this.hudLine.setStrokeWidth((this.pad * 0.35f * (1.0f - f3)) + 1.0f);
+        this.hudLine.setColor(i);
+        this.hudLine.setAlpha((int) ((1.0f - f3) * 170.0f));
+        this.hudR2.set(rectF.left - f4, rectF.top - f4, rectF.right + f4, rectF.bottom + f4);
+        float f5 = f + f4;
+        canvas.drawRoundRect(this.hudR2, f5, f5, this.hudLine);
+    }
+
+    /** Diagonal glint sweeping across a rounded rect; phase outside 0..1 draws nothing. */
+    void hudShine(Canvas canvas, RectF rectF, float f, float f2, int i) {
+        if (f2 < 0.0f || f2 > 1.0f || rectF.width() <= 0.0f || rectF.height() <= 0.0f) {
+            return;
+        }
+        float height = rectF.height();
+        float max = Math.max(this.pad * 1.4f, rectF.width() * 0.1f);
+        float f3 = (rectF.left - height) - max;
+        float f4 = f3 + ((((rectF.right + max) - f3) + (height * 0.6f)) * f2);
+        canvas.save();
+        this.hudClip.reset();
+        this.hudClip.addRoundRect(rectF, f, f, Path.Direction.CW);
+        canvas.clipPath(this.hudClip);
+        this.hudFill.setShader(null);
+        this.hudFill.setStyle(Paint.Style.FILL);
+        this.hudFill.setColor(-1);
+        this.hudFill.setAlpha(i);
+        this.hudPath.reset();
+        this.hudPath.moveTo(f4, rectF.bottom);
+        this.hudPath.lineTo((0.6f * height) + f4, rectF.top);
+        this.hudPath.lineTo((0.6f * height) + f4 + max, rectF.top);
+        this.hudPath.lineTo(f4 + max, rectF.bottom);
+        this.hudPath.close();
+        canvas.drawPath(this.hudPath, this.hudFill);
+        float f5 = (1.6f * max) + f4;
+        float f6 = 0.3f * max;
+        this.hudFill.setAlpha(i / 2);
+        this.hudPath.reset();
+        this.hudPath.moveTo(f5, rectF.bottom);
+        this.hudPath.lineTo((0.6f * height) + f5, rectF.top);
+        this.hudPath.lineTo((0.6f * height) + f5 + f6, rectF.top);
+        this.hudPath.lineTo(f5 + f6, rectF.bottom);
+        this.hudPath.close();
+        canvas.drawPath(this.hudPath, this.hudFill);
+        canvas.restore();
+    }
+
+    /** Text with a chunky pixel drop shadow, using tp's current size/align/typeface. */
+    void hudText(Canvas canvas, String str, float f, float f2, int i, int i2) {
+        float max = Math.max(1.0f, this.pad * 0.2f);
+        this.tp.setColor(-15791588);
+        this.tp.setAlpha((i2 * 200) / 255);
+        canvas.drawText(str, f + max, f2 + max, this.tp);
+        this.tp.setColor(i);
+        this.tp.setAlpha(i2);
+        canvas.drawText(str, f, f2, this.tp);
+    }
+
+    /** drawFit with a pixel drop shadow. */
+    void hudFitText(Canvas canvas, String str, float f, float f2, float f3, int i, int i2) {
+        float max = Math.max(1.0f, this.pad * 0.2f);
+        this.tp.setColor(-15791588);
+        this.tp.setAlpha((i2 * 200) / 255);
+        drawFit(canvas, str, f + max, f2 + max, f3);
+        this.tp.setColor(i);
+        this.tp.setAlpha(i2);
+        drawFit(canvas, str, f, f2, f3);
+    }
+
+    /** Tiny 4-point pixel sparkle. */
+    void hudSparkle(Canvas canvas, float f, float f2, float f3, int i, int i2) {
+        if (f3 <= 0.0f || i2 <= 0) {
+            return;
+        }
+        this.hudFill.setShader(null);
+        this.hudFill.setStyle(Paint.Style.FILL);
+        this.hudFill.setColor(i);
+        this.hudFill.setAlpha(Math.min(255, i2));
+        float f4 = f3 * 0.34f;
+        canvas.drawRect(f - f3, f2 - f4, f + f3, f2 + f4, this.hudFill);
+        canvas.drawRect(f - f4, f2 - f3, f + f4, f2 + f3, this.hudFill);
+    }
+
+    /** Radial icon glow (cached shader per resource, keyed on pad). which: 0 gold, 1 mana, 2 souls. */
+    void hudIconGlow(Canvas canvas, int i, float f, float f2, float f3, float f4) {
+        if (f4 <= 0.01f || f3 <= 0.0f || i < 0 || i > 2) {
+            return;
+        }
+        float max = Math.max(1.0f, this.pad * 3.0f);
+        if (this.hudGlowKey != max) {
+            this.hudGlowSh[0] = null;
+            this.hudGlowSh[1] = null;
+            this.hudGlowSh[2] = null;
+            this.hudGlowKey = max;
+        }
+        if (this.hudGlowSh[i] == null) {
+            int i2 = i == 0 ? -10944 : i == 1 ? -9077505 : -4243201;
+            this.hudGlowSh[i] = new RadialGradient(0.0f, 0.0f, max, new int[]{i2, (16777215 & i2) | 1711276032, 16777215 & i2}, new float[]{0.0f, 0.45f, 1.0f}, Shader.TileMode.CLAMP);
+        }
+        canvas.save();
+        canvas.translate(f, f2);
+        float f5 = f3 / max;
+        canvas.scale(f5, f5);
+        this.hudFill.setStyle(Paint.Style.FILL);
+        this.hudFill.setShader(this.hudGlowSh[i]);
+        this.hudFill.setColor(-1);
+        this.hudFill.setAlpha((int) (Math.min(1.0f, f4) * 255.0f));
+        canvas.drawCircle(0.0f, 0.0f, max, this.hudFill);
+        this.hudFill.setShader(null);
+        canvas.restore();
+    }
+
+    /** Dark inset chip behind a resource counter. */
+    void hudChip(Canvas canvas, float f, float f2, float f3, float f4, int i) {
+        if (f3 - f < this.pad || f4 <= f2) {
+            return;
+        }
+        float f5 = (f4 - f2) * 0.5f;
+        this.hudFill.setShader(null);
+        this.hudFill.setStyle(Paint.Style.FILL);
+        this.hudFill.setColor(-1442638576);
+        this.hudR.set(f, f2, f3, f4);
+        canvas.drawRoundRect(this.hudR, f5, f5, this.hudFill);
+        this.hudFill.setColor(1426063360);
+        this.hudR.set((f5 * 0.5f) + f, f2 + (this.pad * 0.12f), f3 - (f5 * 0.5f), f2 + (this.pad * 0.42f));
+        canvas.drawRect(this.hudR, this.hudFill);
+        this.hudFill.setColor(-1);
+        this.hudFill.setAlpha(26);
+        this.hudR.set((f5 * 0.6f) + f, f4 - (this.pad * 0.3f), f3 - (f5 * 0.6f), f4 - (this.pad * 0.1f));
+        canvas.drawRect(this.hudR, this.hudFill);
+        this.hudR.set(f, f2, f3, f4);
+        this.hudLine.setStyle(Paint.Style.STROKE);
+        this.hudLine.setStrokeWidth(Math.max(1.0f, this.pad * 0.16f));
+        this.hudLine.setColor(i);
+        this.hudLine.setAlpha(110);
+        canvas.drawRoundRect(this.hudR, f5, f5, this.hudLine);
+    }
+
     void drawActions(Canvas canvas, long j) {
         float f = this.W / 3.0f;
         float f2 = this.pad * 0.6f;
+        float f2r = this.pad * IMPACT;
         boolean z = j >= this.meteorReadyAt;
-        boolean z2 = z && this.mana >= meteorCost();
+        double meteorCost = meteorCost();
+        boolean z2 = z && this.mana >= meteorCost;
+        // --- Meteor ---
         this.r.set(this.pad * 1.5f, this.actT, f - f2, this.actB);
-        panel(canvas, this.r, this.pad * IMPACT, z2 ? -4700630 : -12964796);
+        if (z2) {
+            float sinR = (float) ((Math.sin(this.time * 4.0f) * 0.5d) + 0.5d);
+            hudGlow(canvas, this.r, f2r, -30150, (0.45f * sinR) + 0.35f);
+            hudPing(canvas, this.r, f2r, -21952, this.time * 0.8f);
+        }
+        hudPanel(canvas, this.r, f2r, z2 ? -4700630 : z ? -11916230 : -12964796);
+        if (z2) {
+            // rising embers inside the ready button
+            for (int k = 0; k < 7; k++) {
+                float ph = ((this.time * 0.55f) + (k * 0.37f)) % 1.0f;
+                float ex = this.r.left + (this.r.width() * (((k * 0.29f) + 0.08f) % 0.9f + 0.05f)) + ((float) Math.sin((this.time * 3.0f) + k) * this.pad * 0.4f);
+                float ey = this.r.bottom - (this.pad * 0.6f) - (ph * (this.r.height() - (this.pad * 1.2f)));
+                this.hudFill.setShader(null);
+                this.hudFill.setStyle(Paint.Style.FILL);
+                this.hudFill.setColor(k % 2 == 0 ? -10944 : -30150);
+                this.hudFill.setAlpha((int) ((1.0f - ph) * 200.0f));
+                float es = this.pad * (k % 3 == 0 ? 0.4f : 0.28f);
+                canvas.drawRect(ex - es, ey - es, ex + es, ey + es, this.hudFill);
+            }
+            hudShine(canvas, this.r, f2r, ((this.time % 2.6f) / 1.1f), 70);
+        }
         if (!z) {
-            this.p.setColor(1426063360);
-            RectF rectF = new RectF(this.r.left, this.r.top, this.r.left + (this.r.width() * ((this.meteorReadyAt - j) / meteorCd())), this.r.bottom);
-            float f3 = this.pad;
-            canvas.drawRoundRect(rectF, f3 * IMPACT, f3 * IMPACT, this.p);
+            float cd = (float) Math.max(1L, meteorCd());
+            float rem = Math.max(0.0f, Math.min(1.0f, ((float) (this.meteorReadyAt - j)) / cd));
+            // remaining-cooldown shade (clipped to the rounded button)
+            canvas.save();
+            this.hudClip.reset();
+            this.hudClip.addRoundRect(this.r, f2r, f2r, Path.Direction.CW);
+            canvas.clipPath(this.hudClip);
+            this.hudFill.setShader(null);
+            this.hudFill.setStyle(Paint.Style.FILL);
+            this.hudFill.setColor(-1728053248);
+            float edge = this.r.right - (this.r.width() * rem);
+            canvas.drawRect(edge, this.r.top, this.r.right, this.r.bottom, this.hudFill);
+            this.hudFill.setColor(-21952);
+            this.hudFill.setAlpha(160);
+            canvas.drawRect(edge - Math.max(1.0f, this.pad * 0.2f), this.r.top, edge, this.r.bottom, this.hudFill);
+            canvas.restore();
+            // cooldown clock with sweep arc
+            float cr = Math.min(this.pad * 1.15f, this.r.height() * 0.2f);
+            float ccx = this.r.left + (this.pad * 0.6f) + cr;
+            float ccy = this.r.top + (this.pad * 0.6f) + cr;
+            this.hudFill.setColor(-871296992);
+            canvas.drawCircle(ccx, ccy, cr, this.hudFill);
+            this.hudR2.set(ccx - (cr * 0.82f), ccy - (cr * 0.82f), ccx + (cr * 0.82f), ccy + (cr * 0.82f));
+            this.hudFill.setColor(-21952);
+            canvas.drawArc(this.hudR2, -90.0f, (1.0f - rem) * 360.0f, true, this.hudFill);
+            this.hudLine.setStyle(Paint.Style.STROKE);
+            this.hudLine.setStrokeWidth(Math.max(1.0f, this.pad * 0.18f));
+            this.hudLine.setColor(-1);
+            this.hudLine.setAlpha(150);
+            canvas.drawCircle(ccx, ccy, cr, this.hudLine);
+        } else {
+            long since = j - this.meteorReadyAt;
+            if (since >= 0 && since < 450) {
+                float fl = 1.0f - (since / 450.0f);
+                this.hudFill.setShader(null);
+                this.hudFill.setStyle(Paint.Style.FILL);
+                this.hudFill.setColor(-1);
+                this.hudFill.setAlpha((int) (fl * 170.0f));
+                canvas.drawRoundRect(this.r, f2r, f2r, this.hudFill);
+                hudGlow(canvas, this.r, f2r, -1, fl);
+            }
+            if (!z2 && meteorCost > 0.0d) {
+                // mana progress toward the cast cost
+                float mf = (float) Math.max(0.0d, Math.min(1.0d, this.mana / meteorCost));
+                float bl = this.r.left + (this.pad * 1.2f);
+                float br = this.r.right - (this.pad * 1.2f);
+                float bb = this.r.bottom - (this.pad * 0.7f);
+                float bt = bb - (this.pad * 0.55f);
+                this.hudFill.setColor(-1442638576);
+                canvas.drawRect(bl, bt, br, bb, this.hudFill);
+                this.hudFill.setColor(-9077505);
+                canvas.drawRect(bl, bt, bl + ((br - bl) * mf), bb, this.hudFill);
+                this.hudFill.setColor(-1);
+                this.hudFill.setAlpha(90);
+                canvas.drawRect(bl, bt, bl + ((br - bl) * mf), bt + (this.pad * 0.18f), this.hudFill);
+            }
         }
         this.tp.setTextAlign(Paint.Align.CENTER);
-        this.tp.setColor(-1);
         this.tp.setTextSize(this.pad * 1.9f);
         this.tp.setFakeBoldText(true);
-        canvas.drawText("☄ Метеор", this.r.centerX(), this.r.centerY() - (this.pad * 0.2f), this.tp);
+        hudText(canvas, "☄ Метеор", this.r.centerX(), this.r.centerY() - (this.pad * 0.2f), z ? -1 : -3355444, 255);
         this.tp.setFakeBoldText(false);
         this.tp.setTextSize(this.pad * 1.35f);
-        this.tp.setColor(-2043649);
-        canvas.drawText((z ? new StringBuilder().append(fmt(meteorCost())).append(" маны") : new StringBuilder().append("откат ").append(((this.meteorReadyAt - j) / 1000) + 1).append("с")).toString(), this.r.centerX(), this.r.centerY() + (this.pad * 1.8f), this.tp);
+        hudText(canvas, (z ? new StringBuilder().append(fmt(meteorCost)).append(" маны") : new StringBuilder().append("откат ").append(((this.meteorReadyAt - j) / 1000) + 1).append("с")).toString(), this.r.centerX(), this.r.centerY() + (this.pad * 1.8f), -2043649, 255);
+        // --- Buy mode ---
         float f4 = f * 2.0f;
         this.r.set(f + f2, this.actT, f4 - f2, this.actB);
-        panel(canvas, this.r, this.pad * IMPACT, -13746322);
-        this.tp.setColor(-1);
+        hudPanel(canvas, this.r, f2r, -13746322);
+        int nModes = BUY_LABEL.length;
+        if (nModes > 0) {
+            float ps = this.pad * 0.32f;
+            float pgap = this.pad * 1.1f;
+            float px0 = this.r.centerX() - (((nModes - 1) * pgap) / 2.0f);
+            float py = this.r.bottom - (this.pad * 0.95f);
+            for (int k = 0; k < nModes; k++) {
+                boolean on = k == this.buyMode;
+                float pr2 = on ? ps * 1.35f : ps;
+                this.hudFill.setShader(null);
+                this.hudFill.setStyle(Paint.Style.FILL);
+                this.hudFill.setColor(on ? -11430 : 1442840575);
+                float pxk = px0 + (k * pgap);
+                canvas.drawRect(pxk - pr2, py - pr2, pxk + pr2, py + pr2, this.hudFill);
+            }
+        }
         this.tp.setTextSize(this.pad * 2.2f);
         this.tp.setFakeBoldText(true);
-        canvas.drawText("🛒 " + BUY_LABEL[this.buyMode], this.r.centerX(), this.r.centerY() - (this.pad * 0.1f), this.tp);
+        hudText(canvas, "🛒 " + BUY_LABEL[this.buyMode], this.r.centerX(), this.r.centerY() - (this.pad * 0.1f), -1, 255);
         this.tp.setFakeBoldText(false);
         this.tp.setTextSize(this.pad * 1.35f);
-        this.tp.setColor(-4140801);
-        canvas.drawText("режим покупки", this.r.centerX(), this.r.centerY() + (this.pad * 1.8f), this.tp);
+        hudText(canvas, "режим покупки", this.r.centerX(), this.r.centerY() + (this.pad * 1.8f), -4140801, 255);
+        // --- Rebirth ---
         double soulsGain = soulsGain();
         this.r.set(f4 + f2, this.actT, this.W - (this.pad * 1.5f), this.actB);
         if (soulsGain > 0.0d) {
             float sin = (float) ((Math.sin(this.time * 3.0f) * 0.5d) + 0.5d);
             float f5 = 40.0f * sin;
-            panel(canvas, this.r, this.pad * IMPACT, Color.rgb((int) (BF_BOSS_MAX + f5), (int) ((sin * 50.0f) + 130.0f), (int) (f5 + 200.0f)));
+            hudGlow(canvas, this.r, f2r, -7680769, (0.5f * sin) + 0.3f);
+            hudPing(canvas, this.r, f2r, -4243201, (this.time * 0.6f) + 0.5f);
+            hudPanel(canvas, this.r, f2r, Color.rgb((int) (BF_BOSS_MAX + f5), (int) ((sin * 50.0f) + 130.0f), (int) (f5 + 200.0f)));
+            // drifting soul wisps
+            for (int k = 0; k < 5; k++) {
+                float ph = ((this.time * 0.35f) + (k * 0.21f)) % 1.0f;
+                float wx = this.r.left + (this.r.width() * ((k * 0.19f) + 0.1f)) + ((float) Math.sin((this.time * 2.0f) + (k * 1.7f)) * this.pad * 0.8f);
+                float wy = this.r.bottom - (this.pad * 0.5f) - (ph * (this.r.height() - this.pad));
+                float ws = this.pad * 0.3f;
+                this.hudFill.setShader(null);
+                this.hudFill.setStyle(Paint.Style.FILL);
+                this.hudFill.setColor(-1);
+                this.hudFill.setAlpha((int) ((float) Math.sin(ph * 3.1415927f) * 170.0f));
+                canvas.drawRect(wx - ws, wy - ws, wx + ws, wy + ws, this.hudFill);
+                canvas.drawRect(wx - (ws * 0.5f), wy + ws, wx + (ws * 0.5f), wy + (ws * 2.2f), this.hudFill);
+            }
+            hudShine(canvas, this.r, f2r, (((this.time + 1.3f) % 3.0f) / 1.2f), 60);
         } else {
-            panel(canvas, this.r, this.pad * IMPACT, -12964796);
+            hudPanel(canvas, this.r, f2r, -12964796);
         }
-        this.tp.setColor(-1);
         this.tp.setTextSize(this.pad * 1.8f);
         this.tp.setFakeBoldText(true);
-        canvas.drawText("👻 Переродиться", this.r.centerX(), this.r.centerY() - (this.pad * 0.2f), this.tp);
+        hudText(canvas, "👻 Переродиться", this.r.centerX(), this.r.centerY() - (this.pad * 0.2f), soulsGain > 0.0d ? -1 : -3355444, 255);
         this.tp.setFakeBoldText(false);
         this.tp.setTextSize(this.pad * 1.35f);
-        this.tp.setColor(-2043649);
-        canvas.drawText(soulsGain > 0.0d ? "+" + fmt(soulsGain) + " душ" : "с этапа 30", this.r.centerX(), this.r.centerY() + (this.pad * 1.8f), this.tp);
+        hudText(canvas, soulsGain > 0.0d ? "+" + fmt(soulsGain) + " душ" : "с этапа 30", this.r.centerX(), this.r.centerY() + (this.pad * 1.8f), -2043649, 255);
     }
 
     /* JADX WARN: Removed duplicated region for block: B:19:0x0063  */
@@ -3314,17 +3675,49 @@ public class GameView extends View implements Runnable {
             float f31 = this.battleT;
             float f32 = f31 + ((f30 - f31) * 0.38f);
             float f33 = (1.0f - min) * this.W;
-            this.p.setColor(-870969302);
-            this.p.setAlpha((int) (210.0f * min2));
             float f34 = ((f30 - f31) * 0.18f) / 2.0f;
             float f35 = f32 - f34;
             float f36 = f32 + f34;
-            canvas.drawRect(0.0f, f35, this.W, f36, this.p);
-            this.p.setColor(this.towerFight ? -24512 : -2078616);
+            boolean hudTw = this.towerFight;
+            int hudAcc = hudTw ? -24512 : -2078616;
+            if (this.hudBandSh == null || this.hudBandK0 != f35 || this.hudBandK1 != f36 || this.hudBandTower != hudTw) {
+                int hudEdge = hudMix(0xEE16102A, hudAcc | 0xEE000000, 0.4f);
+                this.hudBandSh = new android.graphics.LinearGradient(0.0f, f35, 0.0f, Math.max(f35 + 1.0f, f36), new int[]{hudEdge, 0xEE0E0A1C, 0xF0080612, 0xEE0E0A1C, hudEdge}, new float[]{0.0f, 0.28f, 0.5f, 0.72f, 1.0f}, Shader.TileMode.CLAMP);
+                this.hudBandK0 = f35;
+                this.hudBandK1 = f36;
+                this.hudBandTower = hudTw;
+            }
+            this.hudFill.setStyle(Paint.Style.FILL);
+            this.hudFill.setShader(this.hudBandSh);
+            this.hudFill.setColor(-1);
+            this.hudFill.setAlpha((int) (225.0f * min2));
+            canvas.drawRect(0.0f, f35, this.W, f36, this.hudFill);
+            this.hudFill.setShader(null);
+            // outer glow just beyond the band edges
+            this.hudFill.setColor(hudAcc);
+            this.hudFill.setAlpha((int) (70.0f * min2));
+            canvas.drawRect(0.0f, f35 - (this.pad * 0.5f), this.W, f35, this.hudFill);
+            canvas.drawRect(0.0f, f36, this.W, f36 + (this.pad * 0.5f), this.hudFill);
+            this.hudFill.setAlpha((int) (35.0f * min2));
+            canvas.drawRect(0.0f, f35 - this.pad, this.W, f35 - (this.pad * 0.5f), this.hudFill);
+            canvas.drawRect(0.0f, f36 + (this.pad * 0.5f), this.W, f36 + this.pad, this.hudFill);
+            // white entry flash
+            if (f29 < 0.22f) {
+                this.hudFill.setColor(-1);
+                this.hudFill.setAlpha((int) ((1.0f - (f29 / 0.22f)) * 200.0f));
+                canvas.drawRect(0.0f, f35, this.W, f36, this.hudFill);
+            }
+            this.p.setColor(hudAcc);
             int i6 = (int) (min2 * 255.0f);
             this.p.setAlpha(i6);
             canvas.drawRect(-f33, f35, this.W - f33, f35 + (this.pad * 0.5f), this.p);
             canvas.drawRect(f33, f36 - (this.pad * 0.5f), this.W + f33, f36, this.p);
+            // light pixel line on the rails
+            this.p.setColor(-1);
+            this.p.setAlpha((int) (120.0f * min2));
+            canvas.drawRect(-f33, f35, this.W - f33, f35 + Math.max(1.0f, this.pad * 0.15f), this.p);
+            canvas.drawRect(f33, f36 - (this.pad * 0.5f), this.W + f33, (f36 - (this.pad * 0.5f)) + Math.max(1.0f, this.pad * 0.15f), this.p);
+            this.p.setColor(hudAcc);
             for (int i7 = OV_NONE; i7 < 8; i7++) {
                 int i8 = this.W;
                 float f37 = this.pad;
@@ -3338,23 +3731,37 @@ public class GameView extends View implements Runnable {
             this.tp.setFakeBoldText(false);
             this.tp.setTextAlign(Paint.Align.CENTER);
             this.tp.setTextSize(this.pad * 3.2f);
-            this.tp.setColor(-15331286);
-            this.tp.setAlpha(i6);
-            String str = this.towerFight ? "СТРАЖ!" : "БОСС!";
+            String str = hudTw ? "СТРАЖ!" : "БОСС!";
             float f40 = f33 * 0.5f;
             float f41 = this.pad;
-            canvas.drawText(str, (this.W / 2.0f) + f40 + (f41 * 0.3f), f32 + (f41 * 0.3f) + (f41 * 0.3f), this.tp);
-            this.tp.setColor(this.towerFight ? -16310 : -42390);
+            float hudTx = (this.W / 2.0f) + f40;
+            float hudTy = f32 + (f41 * 0.3f);
+            float hudPunch = 1.0f + (0.9f * (1.0f - min) * (1.0f - min)) + (((float) Math.sin(this.time * 14.0f)) * 0.025f * min2);
+            canvas.save();
+            canvas.scale(hudPunch, hudPunch, hudTx, hudTy - (f41 * 1.2f));
+            // chunky pixel outline
+            float hudO = Math.max(1.0f, f41 * 0.22f);
+            this.tp.setColor(-15331286);
             this.tp.setAlpha(i6);
-            canvas.drawText(str, (this.W / 2.0f) + f40, f32 + (this.pad * 0.3f), this.tp);
+            canvas.drawText(str, hudTx + (f41 * 0.3f), hudTy + (f41 * 0.3f) + (f41 * 0.3f), this.tp);
+            canvas.drawText(str, hudTx - hudO, hudTy, this.tp);
+            canvas.drawText(str, hudTx + hudO, hudTy, this.tp);
+            canvas.drawText(str, hudTx, hudTy - hudO, this.tp);
+            canvas.drawText(str, hudTx, hudTy + hudO, this.tp);
+            int hudTc = hudTw ? -16310 : -42390;
+            if (((int) (this.time * 10.0f)) % 4 == 0 && f29 < 1.0f) {
+                hudTc = hudMix(hudTc, -1, 0.55f);
+            }
+            this.tp.setColor(hudTc);
+            this.tp.setAlpha(i6);
+            canvas.drawText(str, hudTx, hudTy, this.tp);
+            canvas.restore();
             this.tp.setTypeface(Typeface.DEFAULT);
             this.tp.setTextSize(this.pad * 1.7f);
-            this.tp.setColor(-1);
-            this.tp.setAlpha(i6);
             String mobName = mobName();
             int i9 = this.W;
             float f42 = this.pad;
-            drawFit(canvas, mobName, (i9 / 2.0f) - f40, f36 - (f42 * IMPACT), i9 - (f42 * 4.0f));
+            hudFitText(canvas, mobName, (i9 / 2.0f) - f40, f36 - (f42 * IMPACT), i9 - (f42 * 4.0f), -1, i6);
             this.tp.setAlpha(255);
         }
         this.tp.setTextAlign(Paint.Align.CENTER);
@@ -3435,14 +3842,19 @@ public class GameView extends View implements Runnable {
         this.tp.setFakeBoldText(false);
         canvas.restore();
         if (this.farming) {
-            this.p.setColor(Color.rgb((int) ((((float) ((Math.sin(this.time * 4.0f) * 0.5d) + 0.5d)) * BF_BOSS_MAX) + 150.0f), 50, 60));
+            float hudBs = (float) ((Math.sin(this.time * 4.0f) * 0.5d) + 0.5d);
             RectF rectF = this.bossBtn;
             float f44 = this.pad;
-            canvas.drawRoundRect(rectF, f44, f44, this.p);
-            this.tp.setColor(-1);
-            this.tp.setTextSize(this.pad * 1.8f);
+            hudGlow(canvas, rectF, f44, -46502, (0.5f * hudBs) + 0.35f);
+            hudPing(canvas, rectF, f44, -42390, this.time * 0.9f);
+            hudPanel(canvas, rectF, f44, Color.rgb((int) ((hudBs * BF_BOSS_MAX) + 150.0f), 50, 60));
+            hudShine(canvas, rectF, f44, (this.time % 2.2f) / 0.9f, 80);
+            // tiny danger pips in the corners
+            hudSparkle(canvas, rectF.left + (f44 * 1.0f), rectF.top + (f44 * 1.0f), f44 * 0.35f, -11430, (int) (hudBs * 230.0f));
+            hudSparkle(canvas, rectF.right - (f44 * 1.0f), rectF.bottom - (f44 * 1.1f), f44 * 0.35f, -11430, (int) ((1.0f - hudBs) * 230.0f));
+            this.tp.setTextSize(this.pad * 1.8f * ((0.05f * hudBs) + 1.0f));
             this.tp.setFakeBoldText(true);
-            canvas.drawText("⚔ К боссу", this.bossBtn.centerX(), this.bossBtn.centerY() + (this.pad * 0.65f), this.tp);
+            hudText(canvas, "⚔ К боссу", this.bossBtn.centerX(), this.bossBtn.centerY() + (this.pad * 0.65f), -1, 255);
             this.tp.setFakeBoldText(false);
         }
         if (beatUnlocked()) {
@@ -3459,24 +3871,42 @@ public class GameView extends View implements Runnable {
         }
         if (towerUnlocked()) {
             boolean z2 = this.towerFight;
-            this.p.setColor(z2 ? -863348198 : this.towerFloor == 0 ? Color.rgb((int) ((Math.sin(this.time * 4.0f) * 50.0d) + 120.0d), 80, 40) : -869654456);
             RectF rectF3 = this.towerBtn;
             float f46 = this.pad;
-            canvas.drawRoundRect(rectF3, f46, f46, this.p);
+            float hudTs = (float) ((Math.sin(this.time * 4.0f) * 0.5d) + 0.5d);
+            if (z2) {
+                hudGlow(canvas, rectF3, f46, -24512, (0.5f * ((float) ((Math.sin(this.time * 9.0f) * 0.5d) + 0.5d))) + 0.3f);
+            } else if (this.towerFloor == 0) {
+                hudGlow(canvas, rectF3, f46, -16310, (0.45f * hudTs) + 0.25f);
+                hudPing(canvas, rectF3, f46, -16310, (this.time * 0.7f) + 0.3f);
+            }
+            hudPanel(canvas, rectF3, f46, z2 ? -863348198 : this.towerFloor == 0 ? Color.rgb((int) ((Math.sin(this.time * 4.0f) * 50.0d) + 120.0d), 80, 40) : -869654456);
+            if (!z2 && this.towerFloor == 0) {
+                hudShine(canvas, rectF3, f46, ((this.time + 0.7f) % 2.8f) / 1.0f, 60);
+            }
             this.tp.setTextAlign(Paint.Align.CENTER);
-            this.tp.setColor(i);
             this.tp.setTextSize(this.pad * 1.7f);
             this.tp.setFakeBoldText(true);
-            drawFit(canvas, z2 ? "🏰 бой" : "🏰 " + Math.min(this.towerFloor, 999), this.towerBtn.centerX(), this.towerBtn.centerY() + (this.pad * 0.6f), this.towerBtn.width() - this.pad);
+            hudFitText(canvas, z2 ? "🏰 бой" : "🏰 " + Math.min(this.towerFloor, 999), this.towerBtn.centerX(), this.towerBtn.centerY() + (this.pad * 0.6f), this.towerBtn.width() - this.pad, -1, 255);
             this.tp.setFakeBoldText(false);
         }
         if (hasRelics() || this.hasPhones) {
-            this.p.setColor(this.relicNew ? Color.rgb((int) ((Math.sin(this.time * 5.0f) * 60.0d) + 150.0d), 110, 40) : -869654456);
             RectF rectF4 = this.relicBtn;
             float f47 = this.pad;
-            canvas.drawRoundRect(rectF4, f47, f47, this.p);
+            if (this.relicNew) {
+                float hudRs = (float) ((Math.sin(this.time * 5.0f) * 0.5d) + 0.5d);
+                hudGlow(canvas, rectF4, f47, -10944, (0.5f * hudRs) + 0.3f);
+                hudPing(canvas, rectF4, f47, -10944, this.time * 0.8f);
+            }
+            hudPanel(canvas, rectF4, f47, this.relicNew ? Color.rgb((int) ((Math.sin(this.time * 5.0f) * 60.0d) + 150.0d), 110, 40) : -869654456);
+            if (this.relicNew) {
+                hudShine(canvas, rectF4, f47, ((this.time + 1.1f) % 2.4f) / 0.9f, 70);
+                float hudK1 = (float) Math.max(0.0d, Math.sin(this.time * 6.0f));
+                float hudK2 = (float) Math.max(0.0d, Math.sin((this.time * 6.0f) + 2.4f));
+                hudSparkle(canvas, rectF4.right - (f47 * 0.9f), rectF4.top + (f47 * 0.9f), f47 * 0.6f * hudK1, -1, (int) (hudK1 * 240.0f));
+                hudSparkle(canvas, rectF4.left + (f47 * 1.1f), rectF4.bottom - (f47 * 1.0f), f47 * 0.5f * hudK2, -10944, (int) (hudK2 * 240.0f));
+            }
             this.tp.setTextAlign(Paint.Align.CENTER);
-            this.tp.setColor(i);
             this.tp.setTextSize(this.pad * 1.7f);
             this.tp.setFakeBoldText(true);
             int[] iArr = this.rel;
@@ -3485,16 +3915,24 @@ public class GameView extends View implements Runnable {
             for (int i11 = OV_NONE; i11 < length; i11++) {
                 i10 += iArr[i11];
             }
-            drawFit(canvas, "🎒 Реликвии " + i10, this.relicBtn.centerX(), this.relicBtn.centerY() + (this.pad * 0.6f), this.relicBtn.width() - this.pad);
+            hudFitText(canvas, "🎒 Реликвии " + i10, this.relicBtn.centerX(), this.relicBtn.centerY() + (this.pad * 0.6f), this.relicBtn.width() - this.pad, -1, 255);
             this.tp.setFakeBoldText(false);
         }
         if (this.taps >= 5 || this.overlay != 0) {
             return;
         }
+        // tap ripple over the enemy
+        float hudRp = (this.time * 1.1f) % 1.0f;
+        if (this.mobR > 0.0f) {
+            this.hudLine.setStyle(Paint.Style.STROKE);
+            this.hudLine.setStrokeWidth(Math.max(1.0f, this.pad * 0.3f * (1.0f - hudRp)));
+            this.hudLine.setColor(-1);
+            this.hudLine.setAlpha((int) ((1.0f - hudRp) * 150.0f));
+            canvas.drawCircle(this.mobX, this.mobY, this.mobR * ((0.9f * hudRp) + 0.5f), this.hudLine);
+        }
+        float hudBob = ((float) Math.sin(this.time * 4.0f)) * this.pad * 0.45f;
         this.tp.setTextSize(this.pad * 2.4f);
-        this.tp.setColor(i);
-        this.tp.setAlpha((int) ((Math.sin(this.time * 5.0f) * 100.0d) + 150.0d));
-        canvas.drawText("👆 Тапай по экрану!", this.W / 2.0f, this.battleB - (this.pad * IMPACT), this.tp);
+        hudText(canvas, "👆 Тапай по экрану!", this.W / 2.0f, (this.battleB - (this.pad * IMPACT)) + hudBob, i, (int) ((Math.sin(this.time * 5.0f) * 100.0d) + 150.0d));
         this.tp.setAlpha(255);
     }
 
@@ -5424,21 +5862,37 @@ public class GameView extends View implements Runnable {
             this.tp.setTypeface(this.pixTf);
             this.tp.setFakeBoldText(false);
             if (this.combo >= 2) {
+                float hudCp = (this.beatPulse * 0.18f) + 1.0f;
+                boolean hudHot = this.combo >= 25;
                 this.tp.setTextAlign(Paint.Align.LEFT);
-                this.tp.setTextSize(this.pad * 1.25f);
+                this.tp.setTextSize(this.pad * 1.25f * hudCp);
                 this.tp.setColor(-15331286);
                 String str = "КОМБО " + this.combo;
                 float f7 = this.pad;
                 canvas.drawText(str, 1.7f * f7, f6 - (f7 * 0.2f), this.tp);
                 this.tp.setColor(-1);
-                String str2 = "КОМБО " + this.combo;
                 float f8 = this.pad;
-                canvas.drawText(str2, f8 * 1.5f, f6 - (f8 * 0.4f), this.tp);
-                this.tp.setTextSize(this.pad * 1.6f);
-                this.tp.setColor(this.combo >= 25 ? -26051 : -11430);
+                canvas.drawText(str, f8 * 1.5f, f6 - (f8 * 0.4f), this.tp);
+                this.tp.setTextSize(this.pad * 1.6f * hudCp);
                 String str3 = "x" + String.format(Locale.US, "%.2f", Double.valueOf(comboMult()));
                 float f9 = this.pad;
-                canvas.drawText(str3, f9 * 1.5f, (f9 * 1.8f) + f6, this.tp);
+                float hudMx = f9 * 1.5f;
+                float hudMy = (f9 * 1.8f) + f6;
+                if (hudHot) {
+                    // flickering heat aura around a hot multiplier
+                    float hudFl = (float) ((Math.sin(this.time * 13.0f) * 0.5d) + 0.5d);
+                    this.tp.setColor(-38342);
+                    this.tp.setAlpha((int) ((hudFl * 60.0f) + 50.0f));
+                    float hudO = f9 * 0.28f;
+                    canvas.drawText(str3, hudMx - hudO, hudMy, this.tp);
+                    canvas.drawText(str3, hudMx + hudO, hudMy, this.tp);
+                    canvas.drawText(str3, hudMx, hudMy - hudO, this.tp);
+                }
+                this.tp.setColor(-15331286);
+                this.tp.setAlpha(220);
+                canvas.drawText(str3, hudMx + (f9 * 0.22f), hudMy + (f9 * 0.22f), this.tp);
+                this.tp.setColor(hudHot ? -26051 : -11430);
+                canvas.drawText(str3, hudMx, hudMy, this.tp);
             }
             float f10 = 1.0f;
             if (this.taps < 5 || this.overlay != 0) {
@@ -5451,11 +5905,34 @@ public class GameView extends View implements Runnable {
                     float f12 = (this.W * 0.29f) + (i * f11 * 2.4f);
                     float f13 = f11 * (i == 0 ? 0.75f : 0.55f);
                     boolean z = i == floor;
-                    this.p.setColor(z ? i == 0 ? -11430 : -1 : 1442840575);
+                    int hudDc = z ? i == 0 ? -11430 : -1 : 1442840575;
                     if (z) {
                         f13 *= (this.beatPulse * 0.6f) + f10;
+                        // beat halo
+                        this.hudFill.setShader(null);
+                        this.hudFill.setStyle(Paint.Style.FILL);
+                        this.hudFill.setColor(i == 0 ? -10944 : -3355393);
+                        this.hudFill.setAlpha((int) ((this.beatPulse * 110.0f) + 40.0f));
+                        canvas.drawCircle(f12, f6, f13 * 2.3f, this.hudFill);
+                        this.hudFill.setAlpha((int) ((this.beatPulse * 80.0f) + 30.0f));
+                        canvas.drawCircle(f12, f6, f13 * 1.6f, this.hudFill);
                     }
+                    // pixel drop shadow
+                    float hudSh = Math.max(1.0f, f11 * 0.22f);
+                    this.hudFill.setShader(null);
+                    this.hudFill.setStyle(Paint.Style.FILL);
+                    this.hudFill.setColor(-16777216);
+                    this.hudFill.setAlpha(110);
+                    canvas.drawRect((f12 - f13) + hudSh, (f6 - f13) + hudSh, f12 + f13 + hudSh, f13 + f6 + hudSh, this.hudFill);
+                    this.p.setColor(hudDc);
                     canvas.drawRect(f12 - f13, f6 - f13, f12 + f13, f13 + f6, this.p);
+                    if (z) {
+                        // bevel highlight pixel
+                        this.hudFill.setColor(-1);
+                        this.hudFill.setAlpha(200);
+                        float hudHs = f13 * 0.45f;
+                        canvas.drawRect(f12 - f13, f6 - f13, (f12 - f13) + hudHs, (f6 - f13) + hudHs, this.hudFill);
+                    }
                     i++;
                     floor = floor;
                     f10 = 1.0f;
@@ -5468,13 +5945,15 @@ public class GameView extends View implements Runnable {
             rectF.set(i2 * 0.5f, f4, i2 - (this.pad * 1.5f), f5);
             if (z2 && this.isekaiT < 0.0f) {
                 float sin = (float) ((Math.sin(this.time * 6.0f) * 0.5d) + 0.5d);
-                panel(canvas, this.isekaiBtn, this.pad, Color.rgb((int) ((50.0f * sin) + 200.0f), (int) ((sin * 40.0f) + 120.0f), 40));
+                hudGlow(canvas, this.isekaiBtn, this.pad, -24512, (0.5f * sin) + 0.35f);
+                hudPing(canvas, this.isekaiBtn, this.pad, -10944, this.time * 1.2f);
+                hudPanel(canvas, this.isekaiBtn, this.pad, Color.rgb((int) ((50.0f * sin) + 200.0f), (int) ((sin * 40.0f) + 120.0f), 40));
+                hudShine(canvas, this.isekaiBtn, this.pad, (this.time % 1.8f) / 0.8f, 85);
                 this.tp.setTextAlign(Paint.Align.CENTER);
                 this.tp.setTextSize(this.pad * 1.5f);
-                this.tp.setColor(-1);
                 float centerX = this.isekaiBtn.centerX();
                 float f14 = this.pad;
-                canvas.drawText("ИСЕКАЙ!", centerX + (1.5f * f14), (f14 * 0.7f) + f6, this.tp);
+                hudText(canvas, "ИСЕКАЙ!", centerX + (1.5f * f14), (f14 * 0.7f) + f6, -1, 255);
                 float f15 = this.pad * 0.11f;
                 canvas.save();
                 canvas.scale(-1.0f, f, this.isekaiBtn.left + (this.pad * SUPER_END), 0.0f);
@@ -5484,16 +5963,68 @@ public class GameView extends View implements Runnable {
                 float f16 = this.isekaiBtn.left + (this.pad * 4.0f);
                 float f17 = this.isekaiBtn.right;
                 float f18 = this.pad * 1.1f;
-                this.p.setColor(-1441394646);
                 float f19 = f18 / 2.0f;
                 float f20 = f6 - f19;
                 float f21 = f6 + f19;
-                canvas.drawRect(f16, f20, f17, f21, this.p);
-                this.p.setColor(-24512);
                 float f22 = f17 - f16;
-                canvas.drawRect(f16, f20, f16 + ((this.isekaiGauge * f22) / 100.0f), f21, this.p);
-                this.p.setColor(1442840575);
-                canvas.drawRect(f16, f20, f16 + ((f22 * this.isekaiGauge) / 100.0f), f20 + (this.pad * 0.3f), this.p);
+                float hudG = Math.max(0.0f, Math.min(100.0f, this.isekaiGauge)) / 100.0f;
+                float hudFe = f16 + (f22 * hudG);
+                float hudB = Math.max(1.0f, this.pad * 0.22f);
+                this.hudFill.setShader(null);
+                this.hudFill.setStyle(Paint.Style.FILL);
+                // dark pixel frame + drop shadow
+                this.hudFill.setColor(-16777216);
+                this.hudFill.setAlpha(90);
+                canvas.drawRect(f16 - hudB, f20 + hudB, f17 + (hudB * 2.0f), f21 + (hudB * 2.5f), this.hudFill);
+                this.hudFill.setColor(-15791588);
+                canvas.drawRect(f16 - hudB, f20 - hudB, f17 + hudB, f21 + hudB, this.hudFill);
+                this.p.setColor(-1441394646);
+                canvas.drawRect(f16, f20, f17, f21, this.p);
+                if (f22 > 0.0f) {
+                    if (this.hudGaugeSh == null || this.hudGaugeK0 != f16 || this.hudGaugeK1 != f17) {
+                        this.hudGaugeSh = new android.graphics.LinearGradient(f16, 0.0f, f17, 0.0f, new int[]{-2080736, -24512, -11430}, (float[]) null, Shader.TileMode.CLAMP);
+                        this.hudGaugeK0 = f16;
+                        this.hudGaugeK1 = f17;
+                    }
+                    this.hudFill.setShader(this.hudGaugeSh);
+                    this.hudFill.setColor(-1);
+                    canvas.drawRect(f16, f20, hudFe, f21, this.hudFill);
+                    this.hudFill.setShader(null);
+                    if (hudG > 0.8f) {
+                        this.hudFill.setColor(-1);
+                        this.hudFill.setAlpha((int) (((Math.sin(this.time * 10.0f) * 0.5d) + 0.5d) * 70.0d * ((hudG - 0.8f) / 0.2f)));
+                        canvas.drawRect(f16, f20, hudFe, f21, this.hudFill);
+                    }
+                    this.p.setColor(1442840575);
+                    canvas.drawRect(f16, f20, hudFe, f20 + (this.pad * 0.3f), this.p);
+                    this.hudFill.setColor(-16777216);
+                    this.hudFill.setAlpha(70);
+                    canvas.drawRect(f16, f21 - (this.pad * 0.25f), hudFe, f21, this.hudFill);
+                    // travelling shine inside the filled part
+                    float hudSx = f16 + ((((this.time * 0.6f) % 1.3f) - 0.15f) * f22);
+                    float hudSe = Math.min(hudFe, (this.pad * 1.1f) + hudSx);
+                    float hudSs = Math.max(f16, hudSx);
+                    if (hudSe > hudSs) {
+                        this.hudFill.setColor(-1);
+                        this.hudFill.setAlpha(95);
+                        canvas.drawRect(hudSs, f20, hudSe, f21, this.hudFill);
+                    }
+                    // segment ticks
+                    this.hudFill.setColor(-15791588);
+                    this.hudFill.setAlpha(130);
+                    float hudTw = Math.max(1.0f, this.pad * 0.14f);
+                    for (int k = 1; k < 10; k++) {
+                        float hudTx = f16 + ((f22 * k) / 10.0f);
+                        canvas.drawRect(hudTx - (hudTw * 0.5f), f20 + (k % 5 == 0 ? 0.0f : f18 * 0.35f), hudTx + (hudTw * 0.5f), f21, this.hudFill);
+                    }
+                    // flickering leading spark
+                    if (hudG > 0.0f && hudG < 1.0f) {
+                        float hudSp = this.pad * 0.3f;
+                        this.hudFill.setColor(-1);
+                        this.hudFill.setAlpha((int) ((Math.sin(this.time * 20.0f) * 50.0d) + 200.0d));
+                        canvas.drawRect(hudFe - hudSp, f20 - (hudSp * 0.5f), hudFe + (hudSp * 0.3f), f21 + (hudSp * 0.5f), this.hudFill);
+                    }
+                }
                 float f23 = this.pad * 0.09f;
                 canvas.save();
                 canvas.scale(-1.0f, f, this.isekaiBtn.left + (this.pad * 2.0f), 0.0f);
@@ -5501,69 +6032,216 @@ public class GameView extends View implements Runnable {
                 canvas.restore();
             }
             this.tp.setTypeface(Typeface.DEFAULT);
+            this.tp.setAlpha(255);
         }
     }
 
     void drawHeader(Canvas canvas, long j) {
-        this.p.setColor(-14937037);
-        canvas.drawRect(0.0f, 0.0f, this.W, this.headerB, this.p);
+        float hb = this.headerB;
+        float d = this.pad;
+        int bi = biome();
+        int hudAcc = hudBiomeTint(bi);
+        // ---- background: biome-tinted vertical gradient, scanlines, bevel edge and drop shadow ----
+        if (this.hudHeadSh == null || this.hudHeadKey != hb || this.hudHeadKeyPad != d || this.hudHeadBiome != bi) {
+            float hbk = Math.max(1.0f, hb);
+            this.hudHeadSh = new android.graphics.LinearGradient(0.0f, 0.0f, 0.0f, hbk, new int[]{hudMix(-14077872, hudAcc, 0.16f), -14937037, -15462874}, new float[]{0.0f, 0.55f, 1.0f}, Shader.TileMode.CLAMP);
+            this.hudHeadDropSh = new android.graphics.LinearGradient(0.0f, hbk, 0.0f, hbk + Math.max(1.0f, d * 1.6f), -2013265920, 0, Shader.TileMode.CLAMP);
+            this.hudHeadKey = hb;
+            this.hudHeadKeyPad = d;
+            this.hudHeadBiome = bi;
+        }
+        this.hudFill.setStyle(Paint.Style.FILL);
+        this.hudFill.setColor(-1);
+        this.hudFill.setShader(this.hudHeadSh);
+        canvas.drawRect(0.0f, 0.0f, this.W, hb, this.hudFill);
+        this.hudFill.setShader(this.hudHeadDropSh);
+        canvas.drawRect(0.0f, hb, this.W, hb + (d * 1.6f), this.hudFill);
+        this.hudFill.setShader(null);
+        if (d > 0.0f) {
+            this.hudFill.setColor(-16777216);
+            this.hudFill.setAlpha(22);
+            float hudStep = d * 0.6f;
+            for (float hudY = hudStep * 0.5f; hudY < hb; hudY += hudStep) {
+                canvas.drawRect(0.0f, hudY, this.W, hudY + Math.max(1.0f, d * 0.12f), this.hudFill);
+            }
+        }
+        this.hudFill.setColor(hudAcc);
+        this.hudFill.setAlpha(150);
+        canvas.drawRect(0.0f, hb - Math.max(1.0f, d * 0.25f), this.W, hb, this.hudFill);
+        this.hudFill.setColor(-16777216);
+        this.hudFill.setAlpha(200);
+        canvas.drawRect(0.0f, hb, this.W, hb + Math.max(1.0f, d * 0.15f), this.hudFill);
+        // ---- stage progress pips (10 per boss cycle) along the bottom edge ----
+        if (this.W > 0 && d > 0.0f) {
+            int hudSeg = ((this.stage - 1) % 10 + 10) % 10;
+            float hudL = d * 2.0f;
+            float hudRr = this.W - (d * 2.0f);
+            float hudGap = d * 0.35f;
+            float hudSw = ((hudRr - hudL) - (hudGap * 9.0f)) / 10.0f;
+            float hudPb = hb - (d * 0.45f);
+            float hudPt = hudPb - (d * 0.4f);
+            if (hudSw > 0.0f) {
+                for (int k = 0; k < 10; k++) {
+                    float x0 = hudL + (k * (hudSw + hudGap));
+                    boolean boss = k == 9;
+                    int c;
+                    int a;
+                    if (k < hudSeg) {
+                        c = hudAcc;
+                        a = 200;
+                    } else if (k == hudSeg) {
+                        c = boss ? -46502 : -1;
+                        a = (int) ((Math.sin(this.time * 5.0f) * 70.0d) + 170.0d);
+                    } else {
+                        c = boss ? -2078616 : -1;
+                        a = boss ? 110 : 40;
+                    }
+                    this.hudFill.setColor(c);
+                    this.hudFill.setAlpha(a);
+                    canvas.drawRect(x0, hudPt, x0 + hudSw, hudPb, this.hudFill);
+                }
+            }
+        }
+        // ---- top row: life stage, life/stage text, icon buttons ----
         this.tp.setTextAlign(Paint.Align.LEFT);
-        this.tp.setColor(-1);
-        this.tp.setTextSize(this.pad * 2.2f);
+        this.tp.setTextSize(d * 2.2f);
         this.tp.setFakeBoldText(true);
-        canvas.drawText(LIFE_NAME[this.lifeStageIdx], this.pad * 2.0f, this.headerB * 0.33f, this.tp);
+        hudText(canvas, LIFE_NAME[this.lifeStageIdx], d * 2.0f, hb * 0.33f, -1, 255);
         this.tp.setFakeBoldText(false);
         this.tp.setTextAlign(Paint.Align.RIGHT);
-        this.tp.setColor(-4609816);
-        this.tp.setTextSize(this.pad * 1.7f);
-        canvas.drawText("Жизнь №" + this.lifeNo + " · Этап " + this.stage, this.W - (this.pad * 13.5f), this.headerB * 0.33f, this.tp);
-        this.tp.setTextAlign(Paint.Align.CENTER);
-        this.tp.setTextSize(this.pad * 2.4f);
-        this.tp.setColor(-1);
-        canvas.drawText("⚙", this.muteBtn.centerX(), this.headerB * 0.34f, this.tp);
-        canvas.drawText("👭", this.partyBtn.centerX(), this.headerB * 0.34f, this.tp);
-        if (Integer.bitCount(this.compMask) > 0 && this.compSel < 0) {
-            this.p.setColor(-46502);
-            float f = this.partyBtn.right;
-            float f2 = this.pad;
-            canvas.drawCircle(f - f2, 1.4f * f2, f2 * 0.6f, this.p);
+        this.tp.setTextSize(d * 1.7f);
+        hudText(canvas, "Жизнь №" + this.lifeNo + " · Этап " + this.stage, this.W - (d * 13.5f), hb * 0.33f, -4609816, 255);
+        float hudBy = (hb * 0.34f) - (d * 0.85f);
+        float hudBh = Math.min(d * 2.2f, hb * 0.2f);
+        float hudBw = Math.min(d * 2.4f, (this.muteBtn.width() * 0.5f) - (d * 0.6f));
+        if (hudBw > 0.0f && hudBh > 0.0f) {
+            this.hudBtnR.set(this.muteBtn.centerX() - hudBw, hudBy - hudBh, this.muteBtn.centerX() + hudBw, hudBy + hudBh);
+            hudPanel(canvas, this.hudBtnR, d * 0.6f, -14016440);
+            this.hudBtnR.set(this.partyBtn.centerX() - hudBw, hudBy - hudBh, this.partyBtn.centerX() + hudBw, hudBy + hudBh);
+            hudPanel(canvas, this.hudBtnR, d * 0.6f, -14016440);
         }
-        this.tp.setTextSize(this.pad * 2.3f);
-        this.tp.setTextAlign(Paint.Align.LEFT);
-        this.tp.setFakeBoldText(true);
-        float f3 = this.headerB * 0.66f;
-        float f4 = this.pad;
-        float f5 = f3 + (0.25f * f4);
-        float f6 = f4 * 0.3f;
-        blit(canvas, this.bmCoin, f4 * 3.0f, f5, f6, 1.0f, 1.0f, this.bp);
-        Paint paint = this.tp;
-        float f7 = this.goldPulse;
-        paint.setColor(f7 > 0.0f ? Color.rgb(255, ((int) (44.0f * f7)) + 211, ((int) (f7 * 165.0f)) + 90) : -11430);
+        this.tp.setTextAlign(Paint.Align.CENTER);
+        this.tp.setTextSize(d * 2.4f);
+        this.tp.setColor(-1);
+        canvas.drawText("⚙", this.muteBtn.centerX(), hb * 0.34f, this.tp);
+        canvas.drawText("👭", this.partyBtn.centerX(), hb * 0.34f, this.tp);
+        if (Integer.bitCount(this.compMask) > 0 && this.compSel < 0) {
+            float f = this.partyBtn.right;
+            float hudDx = f - d;
+            float hudDy = 1.4f * d;
+            float hudPh = (this.time * 1.2f) % 1.0f;
+            this.hudLine.setStyle(Paint.Style.STROKE);
+            this.hudLine.setStrokeWidth(Math.max(1.0f, d * 0.25f));
+            this.hudLine.setColor(-46502);
+            this.hudLine.setAlpha((int) ((1.0f - hudPh) * 200.0f));
+            canvas.drawCircle(hudDx, hudDy, d * ((1.4f * hudPh) + 0.6f), this.hudLine);
+            this.p.setColor(-46502);
+            canvas.drawCircle(hudDx, hudDy, d * 0.6f * ((((float) Math.sin(this.time * 6.0f)) * 0.15f) + 1.0f), this.p);
+            this.p.setColor(-1);
+            this.p.setAlpha(170);
+            canvas.drawRect(hudDx - (d * 0.3f), hudDy - (d * 0.3f), hudDx - (d * 0.05f), hudDy - (d * 0.05f), this.p);
+            this.p.setAlpha(255);
+        }
+        // ---- resource row: inset chips, glowing icons, pulsing counters ----
+        float f3 = hb * 0.66f;
+        float f5 = f3 + (0.25f * d);
+        float f6 = d * 0.3f;
+        float hudCt = f5 - (d * 3.3f);
+        float hudCb = f5 + (d * 0.5f);
         this.tp.setTypeface(this.pixTf);
         this.tp.setFakeBoldText(false);
-        this.tp.setTextSize(this.pad * 1.75f * ((this.goldPulse * 0.18f) + 1.0f));
-        canvas.drawText(fmt(this.gold), this.pad * 5.3f, this.headerB * 0.66f, this.tp);
-        this.tp.setTextSize(this.pad * 1.75f);
-        blit(canvas, this.bmMana, this.W * 0.38f, f5, f6, 1.0f, 1.0f, this.bp);
-        this.tp.setColor(-4609793);
-        canvas.drawText(fmt(this.mana), (this.W * 0.38f) + ((this.bmMana.getWidth() * f6) / 2.0f) + (this.pad * 0.6f), this.headerB * 0.66f, this.tp);
-        this.tp.setColor(-8395009);
+        this.tp.setTextAlign(Paint.Align.LEFT);
+        this.tp.setTextSize(d * 1.75f);
+        String hudGold = fmt(this.gold);
+        String hudMana = fmt(this.mana);
+        String hudSouls = fmt(this.souls);
+        float hudManaIconW = this.bmMana != null ? (this.bmMana.getWidth() * f6) / 2.0f : d * 2.7f;
+        float hudSoulIconW = this.bmSoul != null ? (this.bmSoul.getWidth() * f6) / 2.0f : d * 2.7f;
+        float hudManaX = this.W * 0.38f;
+        float hudManaTx = hudManaX + hudManaIconW + (d * 0.6f);
+        float hudSoulsW = this.tp.measureText(hudSouls);
+        float hudSoulX = ((this.W - (d * SUPER_END)) - hudSoulsW) - hudSoulIconW;
+        float hudSoulL = (hudSoulX - hudSoulIconW) - (d * 0.5f);
+        float hudGoldR = Math.min((d * 5.3f) + this.tp.measureText(hudGold) + (d * 0.8f), (hudManaX - hudManaIconW) - (d * 0.6f));
+        float hudManaR = Math.min(hudManaTx + this.tp.measureText(hudMana) + (d * 0.8f), hudSoulL - (d * 0.5f));
+        hudChip(canvas, d * 1.0f, hudCt, hudGoldR, hudCb, -11430);
+        hudChip(canvas, (hudManaX - hudManaIconW) - (d * 0.5f), hudCt, hudManaR, hudCb, -4609793);
+        hudChip(canvas, hudSoulL, hudCt, this.W - (d * 1.0f), hudCb, -8395009);
+        // souls pulse when the count grows (visual-only tracking)
+        float hudDt = this.hudPulseLast < 0.0f ? 0.0f : Math.max(0.0f, Math.min(0.1f, this.time - this.hudPulseLast));
+        this.hudPulseLast = this.time;
+        this.hudSoulPulse = Math.max(0.0f, this.hudSoulPulse - (hudDt * 1.6f));
+        if (this.hudLastSouls >= 0.0d && this.souls > this.hudLastSouls) {
+            this.hudSoulPulse = 1.0f;
+        }
+        this.hudLastSouls = this.souls;
+        float gp = this.goldPulse;
+        float hudIconCy = f5 - (d * 1.5f);
+        boolean hudMeteorOk = j >= this.meteorReadyAt && this.mana >= meteorCost();
+        hudIconGlow(canvas, 0, d * 3.0f, hudIconCy, d * ((gp * 1.6f) + 2.8f), (((float) Math.sin(this.time * 2.0f)) * 0.12f) + 0.35f + (gp * 0.6f));
+        hudIconGlow(canvas, 1, hudManaX, hudIconCy, d * (hudMeteorOk ? 3.4f : 2.8f), hudMeteorOk ? (((float) Math.sin(this.time * 4.0f)) * 0.2f) + 0.6f : 0.28f);
+        hudIconGlow(canvas, 2, hudSoulX, hudIconCy, d * ((this.hudSoulPulse * 1.6f) + 2.8f), (((float) Math.sin((this.time * 1.6f) + 1.0f)) * 0.1f) + 0.3f + (this.hudSoulPulse * 0.6f));
+        float hudCoinBob = gp > 0.0f ? -gp * d * 0.5f : 0.0f;
+        if (this.bmCoin != null) {
+            blit(canvas, this.bmCoin, d * 3.0f, f5 + hudCoinBob, f6, 1.0f, 1.0f, this.bp);
+        }
+        if (gp > 0.05f) {
+            // sparkle burst around the coin while gold pulses
+            for (int k = 0; k < 4; k++) {
+                double hudAng = (this.time * 3.0f) + (k * 1.5707963267948966d);
+                float hudRad = d * ((1.0f - gp) * 1.6f + 1.6f);
+                hudSparkle(canvas, (d * 3.0f) + (((float) Math.cos(hudAng)) * hudRad), hudIconCy + (((float) Math.sin(hudAng)) * hudRad * 0.8f), d * 0.45f * gp, k % 2 == 0 ? -1 : -10944, (int) (gp * 255.0f));
+            }
+        }
+        int hudGc = gp > 0.0f ? Color.rgb(255, ((int) (44.0f * gp)) + 211, ((int) (gp * 165.0f)) + 90) : -11430;
+        this.tp.setTextSize(d * 1.75f * ((gp * 0.18f) + 1.0f));
+        hudText(canvas, hudGold, d * 5.3f, f3, hudGc, 255);
+        this.tp.setTextSize(d * 1.75f);
+        if (this.bmMana != null) {
+            blit(canvas, this.bmMana, hudManaX, f5, f6, 1.0f, 1.0f, this.bp);
+        }
+        hudText(canvas, hudMana, hudManaTx, f3, -4609793, 255);
         this.tp.setTextAlign(Paint.Align.RIGHT);
-        canvas.drawText(fmt(this.souls), this.W - (this.pad * 2.0f), this.headerB * 0.66f, this.tp);
-        blit(canvas, this.bmSoul, ((this.W - (this.pad * SUPER_END)) - this.tp.measureText(fmt(this.souls))) - ((this.bmSoul.getWidth() * f6) / 2.0f), f5, f6, 1.0f, 1.0f, this.bp);
+        if (this.hudSoulPulse > 0.0f) {
+            this.tp.setTextSize(d * 1.75f * ((this.hudSoulPulse * 0.15f) + 1.0f));
+        }
+        hudText(canvas, hudSouls, this.W - (d * 2.0f), f3, hudMix(-8395009, -1, this.hudSoulPulse * 0.7f), 255);
+        this.tp.setTextSize(d * 1.75f);
+        if (this.bmSoul != null) {
+            blit(canvas, this.bmSoul, hudSoulX, f5 - (this.hudSoulPulse * d * 0.4f), f6, 1.0f, 1.0f, this.bp);
+        }
         this.tp.setFakeBoldText(false);
         this.tp.setTypeface(Typeface.DEFAULT);
-        this.tp.setTextSize(this.pad * SUPER_IMPACT);
+        // ---- stats line, with a burning band during frenzy ----
+        this.tp.setTextSize(d * SUPER_IMPACT);
         this.tp.setTextAlign(Paint.Align.LEFT);
         boolean z = j < this.frenzyUntil;
-        this.tp.setColor(z ? -25990 : -7569238);
         String str = "+" + fmt(autoDps()) + " урона/с   +" + fmt(manaSec()) + " маны/с   сила ×" + fmt(soulMult() * achMult()) + (this.stars > 0 ? "  ✦" + this.stars : "");
         if (z) {
             str = "🔥 ЯРОСТЬ ×3 (" + (((this.frenzyUntil - j) / 1000) + 1) + "с)   " + str;
+            float hudFz = (float) ((Math.sin(this.time * 9.0f) * 0.5d) + 0.5d);
+            float hudFy = 0.9f * hb;
+            this.hudFill.setShader(null);
+            this.hudFill.setStyle(Paint.Style.FILL);
+            this.hudFill.setColor(-38342);
+            this.hudFill.setAlpha((int) ((hudFz * 30.0f) + 30.0f));
+            canvas.drawRect(0.0f, hudFy - (d * 1.6f), this.W, (d * 0.55f) + hudFy, this.hudFill);
+            this.hudFill.setColor(-10944);
+            this.hudFill.setAlpha((int) ((hudFz * 60.0f) + 60.0f));
+            canvas.drawRect(0.0f, hudFy - (d * 1.6f), this.W, (hudFy - (d * 1.6f)) + Math.max(1.0f, d * 0.15f), this.hudFill);
+            // flickering ember pixels along the band
+            for (int k = 0; k < 8; k++) {
+                float hudEp = ((this.time * 0.9f) + (k * 0.31f)) % 1.0f;
+                float hudEx = ((((k * 0.137f) + 0.05f) % 1.0f) * this.W) + (((float) Math.sin((this.time * 3.0f) + k)) * d);
+                float hudEy = ((d * 0.55f) + hudFy) - (hudEp * d * 2.2f);
+                this.hudFill.setColor(k % 2 == 0 ? -10944 : -38342);
+                this.hudFill.setAlpha((int) ((1.0f - hudEp) * 200.0f));
+                float hudEs = d * 0.22f;
+                canvas.drawRect(hudEx - hudEs, hudEy - hudEs, hudEx + hudEs, hudEy + hudEs, this.hudFill);
+            }
         }
-        String str2 = str;
         float f8 = this.pad;
-        drawFit(canvas, str2, f8 * 2.0f, 0.9f * this.headerB, this.W - (f8 * 4.0f));
+        hudFitText(canvas, str, f8 * 2.0f, 0.9f * this.headerB, this.W - (f8 * 4.0f), z ? -25990 : -7569238, 255);
     }
 
     // ===== gfx(hero): caches & helpers for the hero / familiar / princess (all allocation happens here, never per frame) =====
@@ -9003,31 +9681,127 @@ public class GameView extends View implements Runnable {
         int i3 = (allQuestsClaimed() && (this.questClaimed & 8) == 0) ? i + 1 : i;
         String[] strArr = {"⚔ Улучш.", "👻 Алтарь", "📜 Задания", "🏆 " + Integer.bitCount(this.achMask) + "/" + ACH_NAME.length};
         float f = (this.W - (this.pad * 3.0f)) / 4.0f;
+        float hudD = this.pad;
+        // recessed tray behind the tab strip
+        this.hudFill.setShader(null);
+        this.hudFill.setStyle(Paint.Style.FILL);
+        this.hudFill.setColor(-15595243);
+        this.hudR.set(hudD * 1.2f, this.tabT - (hudD * 0.3f), this.W - (hudD * 1.2f), this.tabB + (hudD * 0.3f));
+        canvas.drawRoundRect(this.hudR, hudD * 1.2f, hudD * 1.2f, this.hudFill);
+        this.hudFill.setColor(-16777216);
+        this.hudFill.setAlpha(110);
+        this.hudR.set(hudD * 1.8f, this.tabT - (hudD * 0.3f), this.W - (hudD * 1.8f), this.tabT - (hudD * 0.05f));
+        canvas.drawRect(this.hudR, this.hudFill);
+        // sliding active-tab highlight (eases toward the selected tab)
+        float hudTarget = (hudD * 1.5f) + (this.tab * f) + (hudD * 0.3f);
+        float hudDt = this.hudTabLast < 0.0f ? 1.0f : Math.max(0.0f, Math.min(0.1f, this.time - this.hudTabLast));
+        this.hudTabLast = this.time;
+        if (this.hudTabX < 0.0f || Math.abs(this.hudTabX - hudTarget) > this.W || hudDt >= 1.0f) {
+            this.hudTabX = hudTarget;
+        } else {
+            this.hudTabX += (hudTarget - this.hudTabX) * Math.min(1.0f, hudDt * 14.0f);
+            if (Math.abs(hudTarget - this.hudTabX) < 0.5f) {
+                this.hudTabX = hudTarget;
+            }
+        }
         int i4 = OV_NONE;
         while (i4 < 4) {
             RectF rectF = this.r;
             float f2 = this.pad;
             int i5 = i4 + 1;
             rectF.set((f2 * 1.5f) + (i4 * f) + (f2 * 0.3f), this.tabT, ((1.5f * f2) + (i5 * f)) - (f2 * 0.3f), this.tabB);
-            this.p.setColor(this.tab == i4 ? -11912582 : -14805453);
-            RectF rectF2 = this.r;
-            float f3 = this.pad;
-            canvas.drawRoundRect(rectF2, f3, f3, this.p);
+            if (this.tab != i4) {
+                // inactive: flat, sunken, dimmed
+                this.hudFill.setShader(null);
+                this.hudFill.setStyle(Paint.Style.FILL);
+                this.hudFill.setColor(-14805453);
+                RectF rectF2 = this.r;
+                float f3 = this.pad;
+                canvas.drawRoundRect(rectF2, f3, f3, this.hudFill);
+                this.hudFill.setColor(-16777216);
+                this.hudFill.setAlpha(80);
+                this.hudR.set(this.r.left + (f3 * 0.7f), this.r.top + (f3 * 0.12f), this.r.right - (f3 * 0.7f), this.r.top + (f3 * 0.45f));
+                canvas.drawRect(this.hudR, this.hudFill);
+                this.hudFill.setColor(-1);
+                this.hudFill.setAlpha(14);
+                this.hudR.set(this.r.left + (f3 * 0.7f), this.r.bottom - (f3 * 0.3f), this.r.right - (f3 * 0.7f), this.r.bottom - (f3 * 0.1f));
+                canvas.drawRect(this.hudR, this.hudFill);
+            }
+            i4 = i5;
+        }
+        // active highlight panel at its eased position
+        float hudTw = f - (hudD * 0.6f);
+        if (hudTw > 0.0f) {
+            this.hudBtnR.set(this.hudTabX, this.tabT, this.hudTabX + hudTw, this.tabB);
+            hudGlow(canvas, this.hudBtnR, hudD, -7712808, 0.35f);
+            hudPanel(canvas, this.hudBtnR, hudD, -11912582);
+            // gold underline with glow
+            float hudUl = this.hudBtnR.left + (hudD * 1.2f);
+            float hudUr = this.hudBtnR.right - (hudD * 1.2f);
+            float hudUb = this.hudBtnR.bottom - (hudD * 0.45f);
+            float hudUs = (float) ((Math.sin(this.time * 3.0f) * 0.5d) + 0.5d);
+            this.hudFill.setShader(null);
+            this.hudFill.setStyle(Paint.Style.FILL);
+            this.hudFill.setColor(-11430);
+            this.hudFill.setAlpha((int) ((hudUs * 40.0f) + 50.0f));
+            canvas.drawRect(hudUl - (hudD * 0.3f), hudUb - (hudD * 0.85f), hudUr + (hudD * 0.3f), hudUb + (hudD * 0.2f), this.hudFill);
+            this.hudFill.setAlpha(255);
+            canvas.drawRect(hudUl, hudUb - (hudD * 0.4f), hudUr, hudUb, this.hudFill);
+            this.hudFill.setColor(-1);
+            this.hudFill.setAlpha(180);
+            canvas.drawRect(hudUl, hudUb - (hudD * 0.4f), hudUr, (hudUb - (hudD * 0.4f)) + Math.max(1.0f, hudD * 0.12f), this.hudFill);
+            // pixel notch pointing down into the panel below
+            float hudNx = this.hudBtnR.centerX();
+            float hudNs = hudD * 0.45f;
+            this.hudFill.setColor(-11430);
+            this.hudFill.setAlpha(255);
+            canvas.drawRect(hudNx - hudNs, this.hudBtnR.bottom - (hudD * 0.05f), hudNx + hudNs, this.hudBtnR.bottom + (hudNs * 0.6f), this.hudFill);
+            canvas.drawRect(hudNx - (hudNs * 0.45f), this.hudBtnR.bottom + (hudNs * 0.6f), hudNx + (hudNs * 0.45f), this.hudBtnR.bottom + (hudNs * 1.2f), this.hudFill);
+        }
+        i4 = OV_NONE;
+        while (i4 < 4) {
+            RectF rectF = this.r;
+            float f2 = this.pad;
+            int i5 = i4 + 1;
+            rectF.set((f2 * 1.5f) + (i4 * f) + (f2 * 0.3f), this.tabT, ((1.5f * f2) + (i5 * f)) - (f2 * 0.3f), this.tabB);
+            boolean hudOn = this.tab == i4;
             this.tp.setTextAlign(Paint.Align.CENTER);
             this.tp.setTextSize(this.pad * 1.8f);
-            this.tp.setColor(this.tab == i4 ? -1 : -7569238);
-            this.tp.setFakeBoldText(this.tab == i4);
-            drawFit(canvas, strArr[i4], this.r.centerX(), this.r.centerY() + (this.pad * 0.65f), this.r.width() - this.pad);
+            this.tp.setFakeBoldText(hudOn);
+            if (hudOn) {
+                hudFitText(canvas, strArr[i4], this.r.centerX(), (this.r.centerY() + (this.pad * 0.65f)) - (this.pad * 0.15f), this.r.width() - this.pad, -1, 255);
+            } else {
+                this.tp.setColor(-7569238);
+                this.tp.setAlpha(210);
+                drawFit(canvas, strArr[i4], this.r.centerX(), this.r.centerY() + (this.pad * 0.65f), this.r.width() - this.pad);
+                this.tp.setAlpha(255);
+            }
             if (i4 == 2 && i3 > 0) {
-                this.p.setColor(-46502);
-                float f4 = this.r.right - (this.pad * 1.1f);
-                float f5 = this.r.top;
                 float f6 = this.pad;
-                canvas.drawCircle(f4, f5 + (f6 * 1.1f), f6 * 1.1f, this.p);
+                float f4 = this.r.right - (f6 * 1.1f);
+                float hudBb = Math.abs((float) Math.sin(this.time * 4.0f)) * f6 * 0.35f;
+                float f5 = (this.r.top + (f6 * 1.1f)) - hudBb;
+                float hudPh = (this.time * 1.1f) % 1.0f;
+                this.hudLine.setStyle(Paint.Style.STROKE);
+                this.hudLine.setStrokeWidth(Math.max(1.0f, f6 * 0.25f));
+                this.hudLine.setColor(-46502);
+                this.hudLine.setAlpha((int) ((1.0f - hudPh) * 200.0f));
+                canvas.drawCircle(f4, f5, f6 * ((hudPh * 1.3f) + 1.1f), this.hudLine);
+                this.hudFill.setShader(null);
+                this.hudFill.setStyle(Paint.Style.FILL);
+                this.hudFill.setColor(-16777216);
+                this.hudFill.setAlpha(100);
+                canvas.drawCircle(f4 + (f6 * 0.15f), f5 + (f6 * 0.25f), f6 * 1.1f, this.hudFill);
+                this.p.setColor(-46502);
+                canvas.drawCircle(f4, f5, f6 * 1.1f, this.p);
+                this.p.setColor(-1);
+                this.p.setAlpha(150);
+                canvas.drawRect(f4 - (f6 * 0.6f), f5 - (f6 * 0.6f), f4 - (f6 * 0.3f), f5 - (f6 * 0.3f), this.p);
+                this.p.setAlpha(255);
                 this.tp.setColor(-1);
                 this.tp.setTextSize(this.pad * 1.3f);
                 this.tp.setFakeBoldText(true);
-                canvas.drawText(String.valueOf(i3), this.r.right - (this.pad * 1.1f), this.r.top + (this.pad * 1.55f), this.tp);
+                canvas.drawText(String.valueOf(i3), f4, f5 + (f6 * 0.45f), this.tp);
                 this.tp.setTextSize(this.pad * 1.8f);
             }
             i4 = i5;
