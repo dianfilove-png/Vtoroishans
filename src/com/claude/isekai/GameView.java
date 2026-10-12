@@ -3195,6 +3195,27 @@ public class GameView extends View implements Runnable {
             float scrollX = scrollX();
             float scrollY = scrollY();
             float f24 = (this.beatPulse * 0.18f) + 1.0f;
+            // challenge scroll: rotating god-rays + cached radial aura + orbiting sparkles
+            if (this.minisScrollSh == null || this.minisScrollKey != this.pad) {
+                this.minisScrollKey = this.pad;
+                this.minisScrollSh = new RadialGradient(0.0f, 0.0f, Math.max(1.0f, this.pad * 8.0f), new int[]{-1426072065, 1442827775, 16769279}, new float[]{0.0f, 0.45f, 1.0f}, Shader.TileMode.CLAMP);
+            }
+            minisRays(canvas, scrollX, scrollY, this.pad * 2.0f, this.pad * 9.0f * f24, 12, this.time * 0.7f, 0.42f, -2045697, (this.beatPulse * 50.0f) + 55.0f);
+            minisRays(canvas, scrollX, scrollY, this.pad * 2.0f, this.pad * 6.5f * f24, 8, -this.time * 1.1f, 0.3f, -5720, (this.beatPulse * 40.0f) + 60.0f);
+            canvas.save();
+            canvas.translate(scrollX, scrollY);
+            this.minisG.setStyle(Paint.Style.FILL);
+            this.minisG.setShader(this.minisScrollSh);
+            this.minisG.setAlpha(minisA((this.beatPulse * 80.0f) + 175.0f));
+            canvas.drawCircle(0.0f, 0.0f, this.pad * 8.0f, this.minisG);
+            this.minisG.setShader(null);
+            this.minisG.setAlpha(255);
+            canvas.restore();
+            for (int minisK = 0; minisK < 5; minisK++) {
+                double minisAng = (this.time * 1.6f) + (minisK * 1.2566370614359172d);
+                float minisTw = ((float) Math.sin((this.time * 8.0f) + (minisK * 1.3f))) * 0.5f + 0.5f;
+                minisStar(canvas, scrollX + (((float) Math.cos(minisAng)) * this.pad * 5.2f), scrollY + (((float) Math.sin(minisAng)) * this.pad * 3.6f), this.hu * ((minisTw * 1.2f) + 0.6f), minisSparkCols[minisK % 4], (minisTw * 140.0f) + 100.0f);
+            }
             this.p.setColor(-5213953);
             this.p.setAlpha((int) ((this.beatPulse * BF_BOSS_MAX) + 110.0f));
             canvas.drawCircle(scrollX, scrollY, this.pad * 4.4f * f24, this.p);
@@ -3209,14 +3230,36 @@ public class GameView extends View implements Runnable {
             this.tp.setTextSize(this.pad * 4.5f * f24);
             this.tp.setColor(-1);
             this.tp.setAlpha((int) 255.0f);
+            // the scroll sways like it is floating on magic
+            canvas.save();
+            canvas.rotate(((float) Math.sin(this.time * 2.3f)) * 9.0f, scrollX, scrollY);
             canvas.drawText("📜", scrollX, (this.pad * 1.6f) + scrollY, this.tp);
+            canvas.restore();
             this.tp.setTypeface(this.pixTf);
             this.tp.setTextSize(this.pad * 1.1f);
-            this.tp.setColor(-15331286);
+            // plaque behind the label with a shimmering border
             float f25 = this.pad;
+            float minisLw = this.tp.measureText("ИСПЫТАНИЕ!") * 0.5f + f25 * 0.9f;
+            this.minisR.set(scrollX - minisLw, (f25 * 4.9f) + scrollY, scrollX + minisLw, (f25 * 6.75f) + scrollY);
+            this.minisP.setStyle(Paint.Style.FILL);
+            this.minisP.setColor(-15331286);
+            this.minisP.setAlpha(190);
+            canvas.drawRoundRect(this.minisR, f25 * 0.5f, f25 * 0.5f, this.minisP);
+            this.minisP.setStyle(Paint.Style.STROKE);
+            this.minisP.setStrokeWidth(Math.max(1.0f, this.hu * 0.6f));
+            this.minisP.setColor(-2045697);
+            this.minisP.setAlpha(minisA((((float) Math.sin(this.time * 6.0f)) * 70.0f) + 170.0f));
+            canvas.drawRoundRect(this.minisR, f25 * 0.5f, f25 * 0.5f, this.minisP);
+            this.minisP.setStyle(Paint.Style.FILL);
+            this.tp.setColor(-15331286);
             canvas.drawText("ИСПЫТАНИЕ!", (0.15f * f25) + scrollX, (f25 * 6.35f) + scrollY, this.tp);
             this.tp.setColor(-2045697);
             canvas.drawText("ИСПЫТАНИЕ!", scrollX, scrollY + (this.pad * 6.2f), this.tp);
+            // glint sweeping across the label
+            float minisGl = ((this.time * 0.6f) % 1.0f) * 2.0f - 0.5f;
+            if (minisGl >= 0.0f && minisGl <= 1.0f) {
+                minisStar(canvas, (this.minisR.left + (this.minisR.width() * minisGl)), this.minisR.top + (f25 * 0.3f), this.hu * 1.6f, -1, 230.0f);
+            }
             this.tp.setTypeface(Typeface.DEFAULT);
             this.tp.setAlpha(255);
         }
@@ -3455,6 +3498,449 @@ public class GameView extends View implements Runnable {
         this.tp.setAlpha(255);
     }
 
+    // ===== minis: visuals for rhythm fight, tower, minigames, fairy, challenge scroll =====
+    final Paint minisP = new Paint(1);
+    final Paint minisG = new Paint(1);
+    final Paint minisT = new Paint(1);
+    final Path minisPath = new Path();
+    final RectF minisR = new RectF();
+    static final int[] minisLaneCols = {-45149, -10825217, -11430};
+    static final int[] minisBeamCols = {-45149, -10825217, -11430, -8592501};
+    static final int[] minisEqCols = {-45149, -5213953, -10825217, -8592501, -11430};
+    static final int[] minisSparkCols = {-5720, -26051, -10825217, -3416};
+    Shader minisBgSh;
+    int minisBgKey = -1;
+    final Shader[] minisLaneSh = new Shader[3];
+    final Shader[] minisBeamSh = new Shader[3];
+    int minisLaneKey = -1;
+    Shader minisHitSh;
+    int minisHitKey = -1;
+    Shader minisBarSh;
+    int minisBarKey = -1;
+    Shader minisFairySh;
+    float minisFairyKey = -1.0f;
+    Shader minisScrollSh;
+    float minisScrollKey = -1.0f;
+    Shader minisTowerSh;
+    int minisTowerKey = -1;
+    Shader minisSkySh;
+    int minisSkyKey = -1;
+
+    static float minisHash(int i) {
+        int h = (i * 374761393) + 668265263;
+        h = (h ^ (h >>> 13)) * 1274126177;
+        h ^= h >>> 16;
+        return (h & 65535) / 65535.0f;
+    }
+
+    static int minisA(float a) {
+        if (a <= 0.0f || a != a) {
+            return 0;
+        }
+        return a >= 255.0f ? 255 : (int) a;
+    }
+
+    /** Soft layered glow without blur filters: concentric translucent discs. */
+    void minisHalo(Canvas c, float x, float y, float r, int col, float a) {
+        if (r <= 0.0f || a <= 0.0f) {
+            return;
+        }
+        this.minisP.setStyle(Paint.Style.FILL);
+        this.minisP.setColor(col);
+        this.minisP.setAlpha(minisA(a * 0.22f));
+        c.drawCircle(x, y, r, this.minisP);
+        this.minisP.setAlpha(minisA(a * 0.28f));
+        c.drawCircle(x, y, r * 0.7f, this.minisP);
+        this.minisP.setAlpha(minisA(a * 0.36f));
+        c.drawCircle(x, y, r * 0.42f, this.minisP);
+    }
+
+    /** Pixel-style four-point twinkle. */
+    void minisStar(Canvas c, float x, float y, float r, int col, float a) {
+        if (r <= 0.0f || a <= 0.0f) {
+            return;
+        }
+        this.minisP.setStyle(Paint.Style.FILL);
+        this.minisP.setColor(col);
+        this.minisP.setAlpha(minisA(a));
+        float t = Math.max(1.0f, r * 0.26f);
+        c.drawRect(x - r, y - t, x + r, y + t, this.minisP);
+        c.drawRect(x - t, y - r, x + t, y + r, this.minisP);
+        this.minisP.setColor(-1);
+        this.minisP.setAlpha(minisA(a));
+        c.drawRect(x - t, y - t, x + t, y + t, this.minisP);
+    }
+
+    /** Radiating light rays built into the cached path. */
+    void minisRays(Canvas c, float x, float y, float r0, float r1, int n, float rot, float width, int col, float a) {
+        if (n <= 0 || r1 <= 0.0f || a <= 0.0f) {
+            return;
+        }
+        this.minisPath.reset();
+        double half = (width * 3.141592653589793d) / n;
+        for (int i = 0; i < n; i++) {
+            double ang = rot + ((i * 6.283185307179586d) / n);
+            this.minisPath.moveTo(x + (((float) Math.cos(ang)) * r0), y + (((float) Math.sin(ang)) * r0));
+            this.minisPath.lineTo(x + (((float) Math.cos(ang - half)) * r1), y + (((float) Math.sin(ang - half)) * r1));
+            this.minisPath.lineTo(x + (((float) Math.cos(ang + half)) * r1), y + (((float) Math.sin(ang + half)) * r1));
+            this.minisPath.close();
+        }
+        this.minisP.setStyle(Paint.Style.FILL);
+        this.minisP.setColor(col);
+        this.minisP.setAlpha(minisA(a));
+        c.drawPath(this.minisPath, this.minisP);
+    }
+
+    /** Centered pixel-font text with a chunky dark outline and drop shadow. */
+    void minisPopText(Canvas c, String s, float x, float y, float size, int col, float a) {
+        if (s == null || s.length() == 0 || size <= 0.0f || a <= 0.0f) {
+            return;
+        }
+        this.minisT.setTypeface(this.pixTf);
+        this.minisT.setTextAlign(Paint.Align.CENTER);
+        this.minisT.setTextSize(size);
+        this.minisT.setStyle(Paint.Style.FILL);
+        float o = Math.max(1.0f, size * 0.07f);
+        this.minisT.setColor(-15331286);
+        this.minisT.setAlpha(minisA(a * 0.85f));
+        c.drawText(s, (o * 1.7f) + x, (o * 1.7f) + y, this.minisT);
+        c.drawText(s, x - o, y, this.minisT);
+        c.drawText(s, x + o, y, this.minisT);
+        c.drawText(s, x, y - o, this.minisT);
+        c.drawText(s, x, y + o, this.minisT);
+        this.minisT.setColor(col);
+        this.minisT.setAlpha(minisA(a));
+        c.drawText(s, x, y, this.minisT);
+    }
+
+    /** Glossy bevel: shine strip on top, shade strip at the bottom. */
+    void minisGloss(Canvas c, RectF rr, float rad, float a) {
+        if (rr.width() <= rad || rr.height() <= 0.0f) {
+            return;
+        }
+        this.minisP.setStyle(Paint.Style.FILL);
+        float h = rr.height();
+        float in = Math.min(rad * 0.6f, rr.width() * 0.25f);
+        this.minisP.setColor(-1);
+        this.minisP.setAlpha(minisA(70.0f * a));
+        c.drawRect(rr.left + in, (h * 0.1f) + rr.top, rr.right - in, (h * 0.3f) + rr.top, this.minisP);
+        this.minisP.setColor(-16777216);
+        this.minisP.setAlpha(minisA(60.0f * a));
+        c.drawRect(rr.left + in, rr.bottom - (h * 0.24f), rr.right - in, rr.bottom - (h * 0.07f), this.minisP);
+    }
+
+    void minisEnsureBeat() {
+        int key = (this.H * 31) + this.W;
+        if (this.minisBgSh == null || this.minisBgKey != key) {
+            this.minisBgKey = key;
+            this.minisBgSh = new android.graphics.LinearGradient(0.0f, 0.0f, 0.0f, Math.max(1, this.H), new int[]{-15071704, -14154440, -13432508, -15464400}, new float[]{0.0f, 0.35f, 0.7f, 1.0f}, Shader.TileMode.CLAMP);
+        }
+        if (this.minisLaneSh[0] == null || this.minisLaneKey != key) {
+            this.minisLaneKey = key;
+            float top = bfTopY();
+            float hit = Math.max(top + 1.0f, bfHitY());
+            for (int i = 0; i < 3; i++) {
+                int c = minisLaneCols[i] & 16777215;
+                this.minisLaneSh[i] = new android.graphics.LinearGradient(0.0f, top, 0.0f, hit, new int[]{c, 838860800 | c, 1828716544 | c}, new float[]{0.0f, 0.7f, 1.0f}, Shader.TileMode.CLAMP);
+                this.minisBeamSh[i] = new android.graphics.LinearGradient(0.0f, top, 0.0f, hit, new int[]{c, 1342177280 | c, -1}, new float[]{0.0f, 0.75f, 1.0f}, Shader.TileMode.CLAMP);
+            }
+        }
+        if (this.minisHitSh == null || this.minisHitKey != key) {
+            this.minisHitKey = key;
+            float hy = bfHitY();
+            float band = (this.H * 0.05f) + 1.0f;
+            this.minisHitSh = new android.graphics.LinearGradient(0.0f, hy - band, 0.0f, hy + band, new int[]{16777215, 1442840575, 16777215}, (float[]) null, Shader.TileMode.CLAMP);
+        }
+        if (this.minisBarSh == null || this.minisBarKey != key) {
+            this.minisBarKey = key;
+            this.minisBarSh = new android.graphics.LinearGradient(this.W * 0.12f, 0.0f, (this.W * 0.88f) + 1.0f, 0.0f, new int[]{-5242816, -45149, -26051}, (float[]) null, Shader.TileMode.CLAMP);
+        }
+    }
+
+    /** Pixel equaliser bars behind the Beatmaker, pumping with the beat. */
+    void minisEqualizer(Canvas c, float pulse) {
+        float base = bfTopY() - (this.pad * 0.6f);
+        float seg = Math.max(2.0f, this.pad * 0.55f);
+        int n = 18;
+        float bw = (this.W * 0.92f) / n;
+        if (bw <= 0.0f) {
+            return;
+        }
+        this.minisP.setStyle(Paint.Style.FILL);
+        for (int i = 0; i < n; i++) {
+            float x = (this.W * 0.04f) + (i * bw);
+            float lv = Math.abs((float) Math.sin((this.time * (2.1f + ((i % 5) * 0.55f))) + (i * 1.37f)));
+            float edge = Math.abs((i - ((n - 1) * 0.5f)) / (n * 0.5f));
+            int blocks = (int) ((((lv * 0.55f) + (pulse * 0.45f)) * (3.0f + (edge * 6.0f))) + 1.0f);
+            int col = minisEqCols[i % minisEqCols.length];
+            for (int b = 0; b < blocks && b < 10; b++) {
+                float y = base - (b * seg * 1.35f);
+                this.minisP.setColor(b >= blocks - 1 ? -1 : col);
+                this.minisP.setAlpha(minisA((b >= blocks - 1 ? 70.0f : 55.0f) + (pulse * 40.0f)));
+                c.drawRect((bw * 0.18f) + x, y - seg, (bw * 0.82f) + x, y, this.minisP);
+            }
+        }
+    }
+
+    /** Drifting glowing motes in the rhythm arena. */
+    void minisDust(Canvas c, float pulse) {
+        this.minisP.setStyle(Paint.Style.FILL);
+        for (int i = 0; i < 26; i++) {
+            float sp = (minisHash(i) * 0.05f) + 0.02f;
+            float fy = 1.0f - (((this.time * sp) + minisHash(i + 77)) % 1.0f);
+            float x = (minisHash(i + 31) * this.W) + (((float) Math.sin((this.time * 0.8f) + i)) * this.pad);
+            float y = fy * this.H;
+            float s = this.hu * ((minisHash(i + 9) * 0.8f) + 0.4f) * ((pulse * 0.5f) + 1.0f);
+            this.minisP.setColor(minisEqCols[i % minisEqCols.length]);
+            this.minisP.setAlpha(minisA(((float) Math.sin(fy * 3.141592653589793d)) * (50.0f + (pulse * 60.0f))));
+            c.drawRect(x - s, y - s, x + s, y + s, this.minisP);
+        }
+    }
+
+    /** Tiny pixel heart (5x4 cells) centered on x, top at y. */
+    void minisHeart(Canvas c, float x, float y, float s, float a) {
+        if (s <= 0.0f || a <= 0.0f) {
+            return;
+        }
+        this.minisP.setStyle(Paint.Style.FILL);
+        this.minisP.setColor(-26051);
+        this.minisP.setAlpha(minisA(a));
+        float l = x - (2.5f * s);
+        c.drawRect(l + s, y, l + (2.0f * s), y + s, this.minisP);
+        c.drawRect(l + (3.0f * s), y, l + (4.0f * s), y + s, this.minisP);
+        c.drawRect(l, y + s, l + (5.0f * s), y + (2.0f * s), this.minisP);
+        c.drawRect(l + s, y + (2.0f * s), l + (4.0f * s), y + (3.0f * s), this.minisP);
+        c.drawRect(l + (2.0f * s), y + (3.0f * s), l + (3.0f * s), y + (4.0f * s), this.minisP);
+        this.minisP.setColor(-1);
+        this.minisP.setAlpha(minisA(a * 0.8f));
+        c.drawRect(l + s, y + s, l + (2.0f * s), y + (2.0f * s), this.minisP);
+    }
+
+    /** Waving pennant on a pole whose foot is at (x, y). */
+    void minisFlag(Canvas c, float x, float y, float h, int col) {
+        if (h <= 0.0f) {
+            return;
+        }
+        float top = y - h;
+        this.minisP.setStyle(Paint.Style.FILL);
+        this.minisP.setColor(-4609816);
+        this.minisP.setAlpha(255);
+        c.drawRect(x - (this.hu * 0.5f), top, (this.hu * 0.5f) + x, y, this.minisP);
+        this.minisP.setColor(-11430);
+        c.drawCircle(x, top, this.hu * 0.9f, this.minisP);
+        float fw = h * 0.7f;
+        float fh = h * 0.36f;
+        this.minisPath.reset();
+        this.minisPath.moveTo(x, top + (this.hu * 0.5f));
+        for (int k = 1; k <= 5; k++) {
+            float u = k / 5.0f;
+            float w = ((float) Math.sin((this.time * 6.0f) - (k * 0.9f))) * fh * 0.22f * u;
+            this.minisPath.lineTo((fw * u) + x, top + (this.hu * 0.5f) + w + (fh * 0.5f * u * 0.3f));
+        }
+        for (int k = 5; k >= 0; k--) {
+            float u = k / 5.0f;
+            float w = ((float) Math.sin((this.time * 6.0f) - (k * 0.9f))) * fh * 0.22f * u;
+            this.minisPath.lineTo((fw * u) + x, top + (this.hu * 0.5f) + fh + w - (fh * 0.5f * u * 0.3f));
+        }
+        this.minisPath.close();
+        this.minisP.setColor(col);
+        c.drawPath(this.minisPath, this.minisP);
+        this.minisP.setColor(-1);
+        this.minisP.setAlpha(60);
+        c.drawRect(x + this.hu, (this.hu * 0.9f) + top, (fw * 0.45f) + x, (this.hu * 0.9f) + top + (fh * 0.2f), this.minisP);
+    }
+
+    /** Night sky panel, moon, stars, clouds and foundation behind the tower. */
+    void minisTowerBack(Canvas c, float cx, float tw, float baseY) {
+        if (this.W <= 0 || this.H <= 0) {
+            return;
+        }
+        float top = this.H * 0.15f;
+        float bottom = (this.pad * 1.6f) + baseY;
+        if (bottom <= top) {
+            return;
+        }
+        int key = (this.H * 31) + this.W;
+        if (this.minisSkySh == null || this.minisSkyKey != key) {
+            this.minisSkyKey = key;
+            this.minisSkySh = new android.graphics.LinearGradient(0.0f, top, 0.0f, bottom, new int[]{Color.rgb(12, 12, 38), Color.rgb(38, 22, 70), Color.rgb(96, 46, 84)}, new float[]{0.0f, 0.6f, 1.0f}, Shader.TileMode.CLAMP);
+        }
+        this.minisR.set(cx - (tw * 0.85f), top, (tw * 0.85f) + cx, bottom);
+        this.minisG.setStyle(Paint.Style.FILL);
+        this.minisG.setShader(this.minisSkySh);
+        this.minisG.setAlpha(235);
+        c.drawRoundRect(this.minisR, this.pad, this.pad, this.minisG);
+        this.minisG.setShader(null);
+        this.minisG.setAlpha(255);
+        c.save();
+        c.clipRect(this.minisR);
+        float wd = this.minisR.width();
+        float ht = this.minisR.height();
+        for (int k = 0; k < 16; k++) {
+            float sx = this.minisR.left + (minisHash(k + 400) * wd);
+            float sy = (minisHash(k + 500) * ht * 0.55f) + top;
+            float tw2 = (((float) Math.sin((this.time * ((minisHash(k) * 3.0f) + 1.5f)) + (k * 2.0f))) * 0.5f) + 0.5f;
+            minisStar(c, sx, sy, this.hu * ((tw2 * 0.8f) + 0.4f), -1, (tw2 * 160.0f) + 50.0f);
+        }
+        float mx = this.minisR.right - (tw * 0.28f);
+        float my = (this.pad * 2.6f) + top;
+        minisHalo(c, mx, my, this.pad * 4.0f, -5720, 120.0f);
+        this.minisP.setStyle(Paint.Style.FILL);
+        this.minisP.setColor(-3416);
+        this.minisP.setAlpha(255);
+        c.drawCircle(mx, my, this.pad * 1.3f, this.minisP);
+        this.minisP.setColor(-4609816);
+        this.minisP.setAlpha(150);
+        c.drawRect(mx - (this.pad * 0.6f), my - (this.pad * 0.3f), mx - (this.pad * 0.2f), (this.pad * 0.1f) + my, this.minisP);
+        c.drawRect((this.pad * 0.2f) + mx, (this.pad * 0.3f) + my, (this.pad * 0.6f) + mx, (this.pad * 0.6f) + my, this.minisP);
+        // drifting pixel clouds
+        for (int k = 0; k < 3; k++) {
+            float cw = (minisHash(k + 600) * 0.3f + 0.35f) * wd;
+            float u = (((this.time * ((k * 0.006f) + 0.012f)) + minisHash(k + 700)) % 1.0f);
+            float clx = (this.minisR.left - cw) + ((wd + cw) * u);
+            float cly = (((k * 0.17f) + 0.18f) * ht) + top;
+            float ch = this.pad * 0.9f;
+            this.minisP.setColor(-4609816);
+            this.minisP.setAlpha(34);
+            c.drawRect(clx, cly, clx + cw, cly + ch, this.minisP);
+            c.drawRect((cw * 0.2f) + clx, cly - (ch * 0.7f), (cw * 0.7f) + clx, cly, this.minisP);
+        }
+        // ground and stone foundation
+        this.minisP.setColor(-14009808);
+        this.minisP.setAlpha(255);
+        c.drawRect(this.minisR.left, baseY, this.minisR.right, bottom, this.minisP);
+        this.minisP.setColor(-11880352);
+        c.drawRect(this.minisR.left, baseY, this.minisR.right, (this.hu * 1.2f) + baseY, this.minisP);
+        c.restore();
+        float fl = cx - (tw * 0.62f);
+        float fr = (tw * 0.62f) + cx;
+        float fb = (this.pad * 1.2f) + baseY;
+        this.minisP.setColor(-11184811);
+        c.drawRect(fl, baseY - this.hu, fr, fb, this.minisP);
+        this.minisP.setColor(-15331286);
+        this.minisP.setAlpha(110);
+        float bw = (fr - fl) / 6.0f;
+        for (int k = 1; k < 6; k++) {
+            float bx = (k * bw) + fl;
+            c.drawRect(bx - (this.hu * 0.35f), baseY - this.hu, (this.hu * 0.35f) + bx, fb, this.minisP);
+        }
+        c.drawRect(fl, fb - (this.hu * 0.8f), fr, fb, this.minisP);
+        this.minisP.setColor(-1);
+        this.minisP.setAlpha(40);
+        c.drawRect(fl, baseY - this.hu, fr, baseY - (this.hu * 0.2f), this.minisP);
+    }
+
+    /** Per-floor detail: side shading, brickwork, windows, current-floor markers. */
+    void minisTowerFloor(Canvas c, RectF rr, int floorNo, boolean cleared, boolean current, float tw) {
+        if (rr.width() <= 0.0f || rr.height() <= 0.0f) {
+            return;
+        }
+        if (this.minisTowerSh == null || this.minisTowerKey != this.W) {
+            this.minisTowerKey = this.W;
+            this.minisTowerSh = new android.graphics.LinearGradient(rr.left, 0.0f, rr.right, 0.0f, new int[]{872415231, 16777215, 16777216, 1426063360}, new float[]{0.0f, 0.35f, 0.6f, 1.0f}, Shader.TileMode.CLAMP);
+        }
+        this.minisG.setStyle(Paint.Style.FILL);
+        this.minisG.setShader(this.minisTowerSh);
+        this.minisG.setAlpha(255);
+        c.drawRect(rr, this.minisG);
+        this.minisG.setShader(null);
+        // brickwork: one mortar course + staggered joints
+        this.minisP.setStyle(Paint.Style.FILL);
+        this.minisP.setColor(-16777216);
+        this.minisP.setAlpha(45);
+        float cy = rr.centerY();
+        float jt = Math.max(1.0f, this.hu * 0.45f);
+        c.drawRect(rr.left, cy - (jt * 0.5f), rr.right, (jt * 0.5f) + cy, this.minisP);
+        float bw = rr.width() / 5.0f;
+        for (int k = 0; k < 5; k++) {
+            float jx = (k * bw) + rr.left + ((floorNo % 2) * bw * 0.5f);
+            if (jx > rr.left + jt && jx < rr.right - jt) {
+                c.drawRect(jx - (jt * 0.5f), rr.top, (jt * 0.5f) + jx, cy, this.minisP);
+            }
+            float jx2 = (k * bw) + rr.left + (((floorNo + 1) % 2) * bw * 0.5f);
+            if (jx2 > rr.left + jt && jx2 < rr.right - jt) {
+                c.drawRect(jx2 - (jt * 0.5f), cy, (jt * 0.5f) + jx2, rr.bottom, this.minisP);
+            }
+        }
+        // arched windows: warm flicker when cleared, battle-red when current
+        float ww = tw * 0.055f;
+        float wh = rr.height() * 0.32f;
+        float wy = (rr.height() * 0.08f) + cy;
+        for (int s = -1; s <= 1; s += 2) {
+            float wx = rr.centerX() + (s * tw * 0.37f);
+            int col;
+            float a;
+            if (cleared) {
+                col = -5720;
+                a = (((float) Math.sin((this.time * 7.0f) + (floorNo * 2.1f) + s)) * 35.0f) + 220.0f;
+                minisHalo(c, wx, wy, ww * 3.0f, -14246, a * 0.7f);
+            } else if (current) {
+                col = -24512;
+                a = (((float) Math.sin(this.time * 5.0f)) * 60.0f) + 195.0f;
+                minisHalo(c, wx, wy, ww * 3.2f, -38294, a * 0.8f);
+            } else {
+                col = -15331286;
+                a = 230.0f;
+            }
+            this.minisP.setColor(col);
+            this.minisP.setAlpha(minisA(a));
+            c.drawRect(wx - ww, wy - wh, wx + ww, wy + wh, this.minisP);
+            c.drawCircle(wx, wy - wh, ww, this.minisP);
+            this.minisP.setColor(-15331286);
+            this.minisP.setAlpha(160);
+            c.drawRect(wx - (jt * 0.5f), (wy - wh) - ww, (jt * 0.5f) + wx, wy + wh, this.minisP);
+        }
+        if (current) {
+            // pulsing outline + bobbing arrows pointing at the floor to storm
+            float pu = (((float) Math.sin(this.time * 5.0f)) * 0.5f) + 0.5f;
+            this.minisP.setStyle(Paint.Style.STROKE);
+            this.minisP.setStrokeWidth(Math.max(1.0f, this.hu * 0.8f));
+            this.minisP.setColor(-11430);
+            this.minisP.setAlpha(minisA((pu * 150.0f) + 100.0f));
+            c.drawRect(rr.left - this.hu, rr.top - this.hu, rr.right + this.hu, rr.bottom + this.hu, this.minisP);
+            this.minisP.setStyle(Paint.Style.FILL);
+            float bob = ((float) Math.sin(this.time * 6.0f)) * this.pad * 0.5f;
+            float ah = rr.height() * 0.35f;
+            float aw = this.pad * 1.1f;
+            this.minisPath.reset();
+            float lx = (rr.left - (this.pad * 0.6f)) - bob;
+            this.minisPath.moveTo(lx, cy);
+            this.minisPath.lineTo(lx - aw, cy - ah);
+            this.minisPath.lineTo(lx - aw, cy + ah);
+            this.minisPath.close();
+            float rx = (this.pad * 0.6f) + rr.right + bob;
+            this.minisPath.moveTo(rx, cy);
+            this.minisPath.lineTo(rx + aw, cy - ah);
+            this.minisPath.lineTo(rx + aw, cy + ah);
+            this.minisPath.close();
+            this.minisP.setColor(-11430);
+            this.minisP.setAlpha(255);
+            c.drawPath(this.minisPath, this.minisP);
+        }
+    }
+
+    /** Ghost floors fading upward when the tower continues beyond view. */
+    void minisTowerFade(Canvas c, float cx, float tw, float topY, float fh) {
+        float hw = tw / 2.0f;
+        for (int k = 0; k < 3; k++) {
+            float b = topY - (k * fh);
+            float t = (b - fh) + (this.pad * 0.25f);
+            if (t < this.H * 0.15f) {
+                break;
+            }
+            this.minisP.setStyle(Paint.Style.FILL);
+            this.minisP.setColor(-12963760);
+            this.minisP.setAlpha(110 - (k * 35));
+            c.drawRect(cx - hw, t, cx + hw, b, this.minisP);
+            this.minisP.setColor(-15331286);
+            this.minisP.setAlpha(80 - (k * 25));
+            c.drawRect(cx - (tw * 0.42f), ((b - t) * 0.3f) + t, cx - (tw * 0.32f), b - ((b - t) * 0.2f), this.minisP);
+            c.drawRect((tw * 0.32f) + cx, ((b - t) * 0.3f) + t, (tw * 0.42f) + cx, b - ((b - t) * 0.2f), this.minisP);
+        }
+        float u = (this.time * 0.5f) % 1.0f;
+        minisStar(c, cx + (((float) Math.sin(this.time * 1.3f)) * hw), (topY - (fh * 1.5f)) - (u * fh), this.hu * 1.2f, -5213953, ((float) Math.sin(u * 3.141592653589793d)) * 200.0f);
+    }
+
     /* JADX WARN: Removed duplicated region for block: B:81:0x0498  */
     /* JADX WARN: Removed duplicated region for block: B:85:0x051d  */
     /*
@@ -3462,12 +3948,15 @@ public class GameView extends View implements Runnable {
         To view partially-correct add '--show-bad-code' argument
     */
     void drawBeatFight(Canvas var1) {
-       for (int var19 = 0; var19 < 24; var19++) {
-          float var6 = (float)var19 / 24.0F;
-          this.p.setColor(Color.rgb((int)(20.0F * var6 + 26.0F), (int)(6.0F * var6 + 10.0F), (int)(30.0F * var6 + 40.0F)));
-          int var20 = this.H;
-          var1.drawRect(0.0F, (float)var20 * var6, (float)this.W, (float)var20 * (var6 + 0.041666668F) + 1.0F, this.p);
+       if (this.W <= 0 || this.H <= 0) {
+          return;
        }
+       this.minisEnsureBeat();
+       this.minisG.setStyle(Style.FILL);
+       this.minisG.setShader(this.minisBgSh);
+       this.minisG.setAlpha(255);
+       var1.drawRect(0.0F, 0.0F, (float)this.W, (float)this.H, this.minisG);
+       this.minisG.setShader(null);
 
        double var2 = this.bfNow;
        double var4 = Math.floor(var2);
@@ -3477,6 +3966,12 @@ public class GameView extends View implements Runnable {
        } else {
           var28 = 0.0F;
        }
+       final float minisPulse = var28;
+       final float minisFrac = (float)(var2 - var4);
+       // beat-synced stage glow behind the Beatmaker + floating motes + equaliser
+       this.minisHalo(var1, (float)this.W * 0.5F, (float)this.H * 0.2F, (float)this.W * (0.42F + 0.06F * minisPulse), -5242816, 70.0F + 110.0F * minisPulse);
+       this.minisDust(var1, minisPulse);
+       this.minisEqualizer(var1, minisPulse);
 
        for (int var93 = 0; var93 < 4; var93++) {
           float var8 = (float)this.W;
@@ -3495,7 +3990,8 @@ public class GameView extends View implements Runnable {
              var7 = -0.45F;
           }
 
-          Path var21 = new Path();
+          Path var21 = this.minisPath;
+          var21.reset();
           float var11 = (float)this.H * 0.5F;
           float var10 = (float)this.W * 0.08F;
           var2 = (double)(var9 * 0.5F + var7);
@@ -3505,9 +4001,21 @@ public class GameView extends View implements Runnable {
           var21.lineTo(var7 - var10, var9);
           var21.lineTo(var7 + var10, var9);
           var21.close();
-          this.p.setColor(new int[]{-45149, -10825217, -11430, -8592501}[var93]);
+          this.p.setColor(minisBeamCols[var93]);
           this.p.setAlpha((int)(40.0F * var28 + 22.0F));
           var1.drawPath(var21, this.p);
+          // bright core of each spotlight + lamp at the rig
+          this.p.setAlpha((int)(30.0F * var28 + 14.0F));
+          var21.reset();
+          var21.moveTo(var8, (float)this.H * 0.04F);
+          var21.lineTo(var7 - var10 * 0.35F, var9);
+          var21.lineTo(var7 + var10 * 0.35F, var9);
+          var21.close();
+          var1.drawPath(var21, this.p);
+          this.minisHalo(var1, var8, (float)this.H * 0.04F, this.pad * (1.6F + var28), minisBeamCols[var93], 200.0F);
+          this.minisP.setColor(-1);
+          this.minisP.setAlpha(230);
+          var1.drawCircle(var8, (float)this.H * 0.04F, this.pad * 0.45F, this.minisP);
        }
 
        this.p.setAlpha(255);
@@ -3545,8 +4053,20 @@ public class GameView extends View implements Runnable {
           var67 = (float)var95;
           var77 = (0.26F * var67 + 0.37F) * var77;
           var83 = var51 + this.pad * 0.3F;
+          // speaker thump: shockwave ring on each beat
+          this.minisP.setStyle(Style.STROKE);
+          this.minisP.setStrokeWidth(this.pad * 0.25F);
+          this.minisP.setColor(-45149);
+          this.minisP.setAlpha(minisA(200.0F * minisPulse));
+          var1.drawCircle(var77, var83, this.pad * (1.7F + (1.0F - minisPulse) * 2.2F), this.minisP);
+          this.minisP.setStyle(Style.FILL);
           this.p.setColor(-15857128);
-          var1.drawCircle(var77, var83, this.pad * 1.6F, this.p);
+          var1.drawCircle(var77, var83, this.pad * (1.6F + 0.18F * minisPulse), this.p);
+          this.minisP.setColor(-12963760);
+          this.minisP.setAlpha(255);
+          var1.drawCircle(var77, var83, this.pad * (1.05F + 0.25F * minisPulse), this.minisP);
+          this.minisP.setColor(-15857128);
+          var1.drawCircle(var77, var83, this.pad * (0.8F + 0.2F * minisPulse), this.minisP);
           this.p.setColor(-45149);
           var1.drawCircle(var77, var83, this.pad * 0.45F, this.p);
           this.p.setColor(1442840575);
@@ -3560,7 +4080,7 @@ public class GameView extends View implements Runnable {
        var83 = this.bfTopY();
        float var12 = this.bfHitY();
        var51 = (float)this.H;
-       int[] var151 = new int[]{-45149, -10825217, -11430};
+       int[] var151 = minisLaneCols;
 
        for (int var96 = 0; var96 < 3; var96++) {
           float var86 = (float)var96 * var13 + var77;
@@ -3578,6 +4098,35 @@ public class GameView extends View implements Runnable {
           var67 = this.pad;
           var1.drawRoundRect(var126, var67, var67, this.p);
           this.p.setAlpha(255);
+          // lane depth: colour gradient brightening toward the hit line
+          this.minisR.set(this.r.left, var83, this.r.right, var12);
+          this.minisG.setShader(this.minisLaneSh[var96]);
+          this.minisG.setAlpha(minisA(150.0F + 60.0F * minisPulse));
+          var1.drawRect(this.minisR, this.minisG);
+          // beat grid: marker lines scrolling toward the hit line, synced to the beat
+          this.minisP.setStyle(Style.FILL);
+          for (int minisK = 0; minisK < 4; minisK++) {
+             float minisU = ((float)minisK + minisFrac) / 4.0F;
+             float minisY = var83 + (var12 - var83) * minisU;
+             this.minisP.setColor(var151[var96]);
+             this.minisP.setAlpha(minisA(25.0F + 70.0F * minisU));
+             var1.drawRect(this.r.left + var67 * 0.5F, minisY - this.hu * 0.5F, this.r.right - var67 * 0.5F, minisY + this.hu * 0.5F, this.minisP);
+          }
+          // lane edge rails
+          this.minisP.setColor(var151[var96]);
+          this.minisP.setAlpha(minisA(70.0F + 120.0F * this.bfLaneFlash[var96]));
+          var1.drawRect(this.r.left, var83 + var67, this.r.left + this.hu * 0.8F, this.r.bottom - var67, this.minisP);
+          var1.drawRect(this.r.right - this.hu * 0.8F, var83 + var67, this.r.right, this.r.bottom - var67, this.minisP);
+          // tap flash: light column shooting up the lane
+          float minisF = this.bfLaneFlash[var96];
+          if (minisF > 0.02F) {
+             this.minisG.setShader(this.minisBeamSh[var96]);
+             this.minisG.setAlpha(minisA(255.0F * Math.min(1.0F, minisF)));
+             float minisInset = var13 * 0.5F * (1.0F - Math.min(1.0F, minisF)) * 0.6F;
+             var1.drawRect(this.r.left + minisInset, var83, this.r.right - minisInset, var12, this.minisG);
+          }
+          this.minisG.setShader(null);
+          this.minisG.setAlpha(255);
        }
 
        RectF var127 = this.r;
@@ -3585,6 +4134,18 @@ public class GameView extends View implements Runnable {
        var67 = var12 - var51;
        var51 = var12 + var51;
        var127.set(var77, var67, var13 * 3.0F + var77, var51);
+       // hit-zone glow band (cached gradient), swelling on the beat
+       this.minisG.setShader(this.minisHitSh);
+       this.minisG.setAlpha(minisA(140.0F + 115.0F * minisPulse));
+       var1.drawRect(var77, var67 - (float)this.H * 0.05F, var13 * 3.0F + var77, var51 + (float)this.H * 0.05F, this.minisG);
+       this.minisG.setShader(null);
+       this.minisG.setAlpha(255);
+       // sparks running along the hit line
+       for (int minisK = 0; minisK < 6; minisK++) {
+          float minisU = ((this.time * 0.35F) + (float)minisK / 6.0F) % 1.0F;
+          float minisSx = var77 + var13 * 3.0F * minisU;
+          this.minisStar(var1, minisSx, var12 + (minisK % 2 == 0 ? var67 - var12 : var51 - var12), this.hu * (0.9F + minisPulse * 1.2F), minisLaneCols[minisK % 3], 120.0F + 120.0F * minisPulse);
+       }
        this.p.setColor(872415231);
        var1.drawRect(this.r, this.p);
        this.p.setStyle(Style.STROKE);
@@ -3609,7 +4170,11 @@ public class GameView extends View implements Runnable {
              var117 = var151[var97];
           }
 
+          if (this.bfLaneFlash[var97] > 0.02F) {
+             this.minisHalo(var1, this.r.centerX(), this.r.centerY(), this.r.width() * (0.55F + 0.25F * this.bfLaneFlash[var97]), var151[var97], 255.0F * Math.min(1.0F, this.bfLaneFlash[var97]));
+          }
           this.panel(var1, var129, var28, var117);
+          this.minisGloss(var1, this.r, this.pad, 1.0F);
           this.tp.setTextAlign(Align.CENTER);
           this.tp.setTypeface(this.pixTf);
           this.tp.setTextSize(this.pad * 1.15F);
@@ -3667,6 +4232,36 @@ public class GameView extends View implements Runnable {
                 var15 + var13 - var17 * 0.8F + var51 * var17 * 2.0F,
                 var88 + var16 + var51 * var17 * 2.0F
              );
+             int minisNc = var23.type == 1 ? -46518 : var151[var23.lane];
+             if (var23.state == 0) {
+                // motion trail streaking behind the falling tile + soft glow
+                for (int minisK = 3; minisK >= 1; minisK--) {
+                   float minisTy = (float)minisK * var14 * 0.42F;
+                   if (var88 - minisTy < var83) {
+                      continue;
+                   }
+                   this.minisP.setStyle(Style.FILL);
+                   this.minisP.setColor(minisNc);
+                   this.minisP.setAlpha(minisA(var28 * (70.0F - (float)minisK * 18.0F)));
+                   float minisSh = (float)minisK * var17 * 0.35F;
+                   var1.drawRect(this.r.left + minisSh, this.r.top - minisTy, this.r.right - minisSh, this.r.bottom - minisTy, this.minisP);
+                }
+                this.minisHalo(var1, this.r.centerX(), this.r.centerY(), this.r.width() * (var98 != 0 ? 0.75F : 0.55F), minisNc, (var98 != 0 ? 220.0F : 110.0F) * var28);
+             } else if (var23.state == 1) {
+                // hit burst: expanding ring and radial sparks
+                float minisB = Math.min(1.0F, var23.hitT / 0.3F);
+                this.minisP.setStyle(Style.STROKE);
+                this.minisP.setStrokeWidth(this.pad * 0.5F * (1.0F - minisB) + 1.0F);
+                this.minisP.setColor(var23.type == 1 ? -46518 : -1);
+                this.minisP.setAlpha(minisA(255.0F * (1.0F - minisB)));
+                var1.drawCircle(this.r.centerX(), this.r.centerY(), var13 * (0.25F + 0.55F * minisB), this.minisP);
+                this.minisP.setStyle(Style.FILL);
+                for (int minisK = 0; minisK < 8; minisK++) {
+                   double minisAng = (double)minisK * 0.7853981633974483 + (double)var23.lane;
+                   float minisD = var13 * (0.2F + 0.7F * minisB);
+                   this.minisStar(var1, this.r.centerX() + (float)Math.cos(minisAng) * minisD, this.r.centerY() + (float)Math.sin(minisAng) * minisD * 0.7F, this.hu * (1.6F - minisB), var151[var23.lane], 255.0F * (1.0F - minisB));
+                }
+             }
              if (var23.type == 1) {
                 this.p.setColor(-15331286);
                 Paint var153 = this.p;
@@ -3754,6 +4349,24 @@ public class GameView extends View implements Runnable {
        RectF var135 = this.r;
        var28 = this.pad;
        var1.drawRoundRect(var135, var28 * 0.6F, var28 * 0.6F, this.p);
+       if (this.r.width() > 0.0F) {
+          // gradient fill, gloss, segment ticks and a hot leading edge
+          this.minisG.setShader(this.minisBarSh);
+          this.minisG.setAlpha(255);
+          var1.drawRoundRect(this.r, var28 * 0.6F, var28 * 0.6F, this.minisG);
+          this.minisG.setShader(null);
+          this.minisGloss(var1, this.r, var28 * 0.6F, 1.0F);
+          this.minisP.setStyle(Style.FILL);
+          this.minisP.setColor(-15331286);
+          this.minisP.setAlpha(90);
+          for (int minisK = 1; minisK < 10; minisK++) {
+             float minisX = (float)this.W * 0.12F + (float)this.W * 0.076F * (float)minisK;
+             if (minisX < this.r.right - this.hu) {
+                var1.drawRect(minisX - this.hu * 0.4F, this.r.top + this.hu, minisX + this.hu * 0.4F, this.r.bottom - this.hu, this.minisP);
+             }
+          }
+          this.minisHalo(var1, this.r.right, this.r.centerY(), this.pad * (1.4F + this.bfBossHurt), -1, 120.0F + 135.0F * this.bfBossHurt);
+       }
        this.tp.setTextSize(this.pad * 1.0F);
        this.tp.setColor(-4609816);
        String var136;
@@ -3789,25 +4402,67 @@ public class GameView extends View implements Runnable {
        RectF var141 = this.r;
        var28 = this.pad;
        var1.drawRoundRect(var141, var28 * 0.5F, var28 * 0.5F, this.p);
+       if (this.r.width() > 0.0F) {
+          this.minisGloss(var1, this.r, var28 * 0.5F, 1.0F);
+          if (this.bfHeroHp <= 35.0F) {
+             // low-health heartbeat glow on the player's bar
+             float minisLow = (float)(Math.sin((double)(this.time * 9.0F)) * 0.5 + 0.5);
+             this.minisP.setStyle(Style.STROKE);
+             this.minisP.setStrokeWidth(this.pad * 0.3F);
+             this.minisP.setColor(-38294);
+             this.minisP.setAlpha(minisA(90.0F + 150.0F * minisLow));
+             this.minisR.set(this.pad * 5.0F - this.hu, this.r.top - this.hu, (float)this.W * 0.6F + this.hu, this.r.bottom + this.hu);
+             var1.drawRoundRect(this.minisR, var28 * 0.6F, var28 * 0.6F, this.minisP);
+             this.minisP.setStyle(Style.FILL);
+          }
+       }
        if (this.bfHurt > 0.0F) {
           this.p.setColor(-65536);
           this.p.setAlpha((int)(this.bfHurt * 70.0F));
           var1.drawRect(0.0F, 0.0F, (float)this.W, (float)this.H, this.p);
           this.p.setAlpha(255);
+          // red damage vignette hugging the screen edges
+          this.minisP.setStyle(Style.STROKE);
+          this.minisP.setColor(-65536);
+          for (int minisK = 0; minisK < 3; minisK++) {
+             float minisSw = this.pad * (1.2F + (float)minisK * 1.4F);
+             this.minisP.setStrokeWidth(minisSw);
+             this.minisP.setAlpha(minisA(this.bfHurt * (110.0F - (float)minisK * 30.0F)));
+             var1.drawRect(minisSw * 0.5F, minisSw * 0.5F, (float)this.W - minisSw * 0.5F, (float)this.H - minisSw * 0.5F, this.minisP);
+          }
+          this.minisP.setStyle(Style.FILL);
        }
 
        if (this.bfCombo >= 2) {
+          // combo counter glows hotter as the streak grows and kicks on the beat
+          float minisCs = 1.0F + 0.12F * minisPulse + Math.min(0.25F, (float)this.bfCombo * 0.01F);
+          float minisCx = (float)this.W - this.pad * 2.0F;
+          float minisCy = (float)this.H * 0.935F;
           this.tp.setTextAlign(Align.RIGHT);
+          float minisTs = this.tp.getTextSize();
+          this.tp.setTextSize(minisTs * minisCs);
+          String minisCt = "КОМБО " + this.bfCombo;
+          float minisCw = this.tp.measureText(minisCt);
+          this.minisHalo(var1, minisCx - minisCw * 0.5F, minisCy - minisTs * 0.4F, minisCw * 0.75F, this.bfCombo >= 10 ? -26051 : -11430, 70.0F + 90.0F * minisPulse);
+          this.tp.setColor(-15331286);
+          var1.drawText(minisCt, minisCx + this.hu, minisCy + this.hu, this.tp);
           this.tp.setColor(-11430);
-          var1.drawText("КОМБО " + this.bfCombo, (float)this.W - this.pad * 2.0F, (float)this.H * 0.935F, this.tp);
+          var1.drawText(minisCt, minisCx, minisCy, this.tp);
+          this.tp.setTextSize(minisTs);
        }
 
        if (this.bfJudgeT > 0.0F) {
           this.tp.setTextAlign(Align.CENTER);
           this.tp.setTextSize(this.pad * 2.0F);
-          this.tp.setColor(this.bfJudgeCol);
-          this.tp.setAlpha((int)(Math.min(1.0F, this.bfJudgeT * 3.0F) * 255.0F));
-          var1.drawText(this.bfJudge, (float)this.W / 2.0F, var67 - this.pad * 1.5F, this.tp);
+          // judgement pop: overshoot scale, rise, chunky outline
+          float minisAge = Math.max(0.0F, 0.6F - this.bfJudgeT);
+          float minisSc = minisAge < 0.08F ? 0.6F + minisAge / 0.08F * 0.75F : 1.35F - Math.min(0.35F, (minisAge - 0.08F) * 2.5F);
+          float minisJy = var67 - this.pad * 1.5F - minisAge * this.pad * 3.0F;
+          float minisJa = Math.min(1.0F, this.bfJudgeT * 3.0F) * 255.0F;
+          if (minisAge < 0.25F) {
+             this.minisRays(var1, (float)this.W / 2.0F, minisJy - this.pad * 0.7F, this.pad * 1.5F, this.pad * (3.0F + minisAge * 14.0F), 12, this.time, 0.35F, this.bfJudgeCol, 110.0F * (1.0F - minisAge / 0.25F));
+          }
+          this.minisPopText(var1, this.bfJudge, (float)this.W / 2.0F, minisJy, this.pad * 2.0F * minisSc, this.bfJudgeCol, minisJa);
           this.tp.setAlpha(255);
        }
 
@@ -3863,6 +4518,13 @@ public class GameView extends View implements Runnable {
              var28 = 1.8F;
           }
 
+          if (var144.length() <= 2 || var94 <= 0 && var2 >= 0.0) {
+             // countdown beats punch in with a burst behind them
+             float minisK2 = 1.0F - minisFrac;
+             var28 *= 1.0F + 0.35F * minisK2 * minisK2;
+             this.minisRays(var1, (float)this.W / 2.0F, (float)this.H * 0.5F - var51 * 1.5F, var51 * 2.0F, var51 * (6.0F + 3.0F * minisK2), 14, this.time * 0.8F, 0.4F, -45149, 40.0F + 90.0F * minisK2);
+             this.minisHalo(var1, (float)this.W / 2.0F, (float)this.H * 0.5F - var51 * 1.5F, var51 * (5.0F + 2.0F * minisK2), -5242816, 120.0F + 100.0F * minisK2);
+          }
           var152.setTextSize(var51 * var28);
           this.tp.setColor(-1);
           var94 = this.W;
@@ -3909,6 +4571,15 @@ public class GameView extends View implements Runnable {
           var94 = this.W;
           var1.drawCircle((float)var94 / 2.0F, var28, (float)var94 * 0.3F, this.p);
           this.p.setAlpha(255);
+          // victory: spinning god-rays, glow and orbiting sparkles around the trophy
+          this.minisRays(var1, (float)var94 / 2.0F, var28, (float)var94 * 0.08F, (float)var94 * 0.62F, 16, this.time * 0.4F, 0.45F, -11430, 55.0F);
+          this.minisRays(var1, (float)var94 / 2.0F, var28, (float)var94 * 0.08F, (float)var94 * 0.45F, 10, -this.time * 0.6F, 0.3F, -45149, 70.0F);
+          this.minisHalo(var1, (float)var94 / 2.0F, var28, (float)var94 * 0.26F, -1, 120.0F);
+          for (int minisK = 0; minisK < 10; minisK++) {
+             double minisAng = (double)(this.time * 1.2F) + (double)minisK * 0.6283185307179586;
+             float minisRr = (float)var94 * (0.24F + 0.04F * (float)Math.sin((double)(this.time * 3.0F + (float)minisK)));
+             this.minisStar(var1, (float)var94 / 2.0F + (float)Math.cos(minisAng) * minisRr, var28 + (float)Math.sin(minisAng) * minisRr * 0.8F, this.hu * (1.2F + 0.8F * (float)Math.abs(Math.sin((double)(this.time * 5.0F + (float)minisK)))), minisSparkCols[minisK % 4], 230.0F);
+          }
           Bitmap var146 = this.icPhones;
           this.blit(var1, var146, (float)this.W / 2.0F, var28 + (float)var146.getHeight() * var51 / 2.0F, var51, 1.0F, 1.0F, this.bp);
           this.tp.setFakeBoldText(true);
@@ -3921,6 +4592,9 @@ public class GameView extends View implements Runnable {
              var147 = "Победа над Битмейкером!";
           }
 
+          this.tp.setColor(-15331286);
+          var1.drawText(var147, (float)this.W / 2.0F + this.hu * 1.2F, (float)this.H * 0.6F + this.hu * 1.2F, this.tp);
+          this.tp.setColor(-11430);
           var1.drawText(var147, (float)this.W / 2.0F, (float)this.H * 0.6F, this.tp);
           this.tp.setFakeBoldText(false);
           this.tp.setTextSize(this.pad * 1.7F);
@@ -3965,6 +4639,14 @@ public class GameView extends View implements Runnable {
           var150.set(4.0F * var28, (float)var94 * 0.55F, (float)this.W / 2.0F - var28, (float)var94 * 0.63F);
           this.panel(var1, this.bfExit, this.pad * 1.5F, -12963760);
           this.panel(var1, this.bfRetry, this.pad * 1.5F, -4700630);
+          this.minisGloss(var1, this.bfExit, this.pad * 1.5F, 0.8F);
+          this.minisGloss(var1, this.bfRetry, this.pad * 1.5F, 0.8F);
+          this.minisP.setStyle(Style.STROKE);
+          this.minisP.setStrokeWidth(this.pad * 0.3F);
+          this.minisP.setColor(-11430);
+          this.minisP.setAlpha(minisA((float)(Math.sin((double)(this.time * 5.0F)) * 90.0 + 150.0)));
+          var1.drawRoundRect(this.bfRetry, this.pad * 1.5F, this.pad * 1.5F, this.minisP);
+          this.minisP.setStyle(Style.FILL);
           this.tp.setColor(-1);
           this.tp.setTextSize(this.pad * 2.1F);
           var1.drawText("Выйти", this.bfExit.centerX(), this.bfExit.centerY() + this.pad * 0.75F, this.tp);
@@ -3982,32 +4664,64 @@ public class GameView extends View implements Runnable {
             int i = this.combo;
             int i2 = i >= 25 ? -26051 : i >= 10 ? -11430 : i > 0 ? -6295297 : -1;
             float max = (float) Math.max(0.0d, 1.0d - ((beatPos - Math.floor(beatPos)) / BF_GOOD));
+            // beat window glow filling the target ring
+            this.p.setStyle(Paint.Style.FILL);
+            minisHalo(canvas, this.mobX, this.mobY, f * 1.15f, i2, 110.0f * max);
+            this.p.setStyle(Paint.Style.STROKE);
             this.p.setColor(i2);
             this.p.setAlpha((int) ((150.0f * max) + 55.0f));
             this.p.setStrokeWidth(this.pad * ((max * 0.4f) + 0.3f));
             canvas.drawCircle(this.mobX, this.mobY, f, this.p);
+            // rotating rhythm ticks around the target ring (spin faster with combo)
+            this.minisP.setStyle(Paint.Style.STROKE);
+            this.minisP.setStrokeWidth(Math.max(1.0f, this.pad * 0.28f));
+            this.minisP.setColor(i2);
+            this.minisP.setAlpha(minisA((120.0f * max) + 70.0f));
+            float minisRot = this.time * (0.6f + (Math.min(30, this.combo) * 0.05f));
+            for (int minisK = 0; minisK < 12; minisK++) {
+                double minisAng = minisRot + (minisK * 0.5235987755982988d);
+                float minisC = (float) Math.cos(minisAng);
+                float minisS = (float) Math.sin(minisAng);
+                float minisL = (minisK % 3 == 0 ? 0.16f : 0.08f) * f;
+                canvas.drawLine(this.mobX + (minisC * (f + (this.pad * 0.5f))), this.mobY + (minisS * (f + (this.pad * 0.5f))), this.mobX + (minisC * (f + (this.pad * 0.5f) + minisL)), this.mobY + (minisS * (f + (this.pad * 0.5f) + minisL)), this.minisP);
+            }
+            // echo of the approach ring for a sense of speed
+            this.minisP.setStrokeWidth(this.pad * 0.2f);
+            this.minisP.setAlpha(minisA((1.0f - floor) * 80.0f));
+            canvas.drawCircle(this.mobX, this.mobY, f2 * 1.1f, this.minisP);
+            this.minisP.setStyle(Paint.Style.FILL);
             this.p.setAlpha((int) (((1.0f - floor) * 170.0f) + 40.0f));
             this.p.setStrokeWidth(this.pad * 0.35f);
             canvas.drawCircle(this.mobX, this.mobY, f2, this.p);
             this.p.setStyle(Paint.Style.FILL);
             this.p.setAlpha(255);
+            if (max > 0.05f) {
+                // on-beat sparkles flare at the compass points
+                for (int minisK = 0; minisK < 4; minisK++) {
+                    double minisAng = (minisK * 1.5707963267948966d) + 0.7853981633974483d;
+                    minisStar(canvas, this.mobX + (((float) Math.cos(minisAng)) * f), this.mobY + (((float) Math.sin(minisAng)) * f), this.hu * ((max * 2.2f) + 0.4f), i2, 255.0f * max);
+                }
+            }
+            if (this.combo >= 10) {
+                // hot combo: embers orbiting the ring
+                int minisN = this.combo >= 25 ? 8 : 5;
+                for (int minisK = 0; minisK < minisN; minisK++) {
+                    double minisAng = (this.time * 2.2f) + ((minisK * 6.283185307179586d) / minisN);
+                    float minisR0 = f * (((float) Math.sin((this.time * 4.0f) + minisK)) * 0.06f + 1.0f);
+                    float minisEx = this.mobX + (((float) Math.cos(minisAng)) * minisR0);
+                    float minisEy = this.mobY + (((float) Math.sin(minisAng)) * minisR0);
+                    minisHalo(canvas, minisEx, minisEy, this.hu * 3.0f, i2, 160.0f);
+                    this.minisP.setColor(-1);
+                    this.minisP.setAlpha(220);
+                    canvas.drawRect(minisEx - (this.hu * 0.7f), minisEy - (this.hu * 0.7f), (this.hu * 0.7f) + minisEx, (this.hu * 0.7f) + minisEy, this.minisP);
+                }
+            }
             if (this.judgeT > 0.0f) {
-                this.tp.setTypeface(this.pixTf);
-                this.tp.setFakeBoldText(false);
-                this.tp.setTextAlign(Paint.Align.CENTER);
-                this.tp.setTextSize(this.pad * 1.5f * (((this.judgeT - 0.3f) * 0.6f) + 1.0f));
-                int min = (int) (Math.min(1.0f, this.judgeT * 3.0f) * 255.0f);
-                this.tp.setColor(-15331286);
-                this.tp.setAlpha(min);
-                String str = this.judgeTxt;
-                float f3 = this.mobX;
-                float f4 = this.pad;
-                canvas.drawText(str, f3 + (0.2f * f4), (this.mobY - f) - (f4 * 0.6f), this.tp);
-                this.tp.setColor(this.judgeCol);
-                this.tp.setAlpha(min);
-                canvas.drawText(this.judgeTxt, this.mobX, (this.mobY - f) - (this.pad * 0.8f), this.tp);
-                this.tp.setAlpha(255);
-                this.tp.setTypeface(Typeface.DEFAULT);
+                // judgement pop: overshoot, rise and outline
+                float minisAge = Math.max(0.0f, 0.5f - this.judgeT);
+                float minisSc = minisAge < 0.07f ? (minisAge / 0.07f) * 0.7f + 0.65f : 1.35f - Math.min(0.3f, (minisAge - 0.07f) * 2.0f);
+                float minisA0 = Math.min(1.0f, this.judgeT * 3.0f) * 255.0f;
+                minisPopText(canvas, this.judgeTxt, this.mobX, ((this.mobY - f) - (this.pad * 0.8f)) - (minisAge * this.pad * 2.5f), this.pad * 1.5f * minisSc, this.judgeCol, minisA0);
             }
         }
     }
@@ -4286,19 +5000,82 @@ public class GameView extends View implements Runnable {
     void drawFairy(Canvas canvas) {
         float f = this.fairyX;
         float f2 = this.fairyY;
-        this.p.setColor(1442837160);
-        canvas.drawCircle(f, f2, this.hu * 7.0f, this.p);
-        this.p.setColor(872411816);
-        canvas.drawCircle(f, f2, this.hu * 11.0f, this.p);
-        Bitmap bitmap = this.bmFairy[((int) (this.time * 10.0f)) % 2];
-        canvas.save();
-        if (this.fairyDir < 0.0f) {
-            canvas.scale(-1.0f, 1.0f, f, f2);
+        float minisHu = this.hu;
+        float minisDir = this.fairyDir < 0.0f ? -1.0f : 1.0f;
+        float minisBreath = (((float) Math.sin(this.time * 3.0f)) * 0.08f) + 1.0f;
+        // soft shadow on the ground gives the fairy height and depth
+        float minisSpan = Math.max(1.0f, this.battleB - this.battleT);
+        float minisNear = Math.max(0.0f, 1.0f - (Math.abs(this.groundY - f2) / minisSpan));
+        if (minisNear > 0.0f) {
+            this.minisP.setStyle(Paint.Style.FILL);
+            this.minisP.setColor(-16777216);
+            this.minisP.setAlpha(minisA(70.0f * minisNear));
+            float minisSw = minisHu * ((3.0f * minisNear) + 2.0f);
+            this.minisR.set(f - minisSw, this.groundY - (minisHu * 0.9f), f + minisSw, this.groundY + (minisHu * 0.9f));
+            canvas.drawOval(this.minisR, this.minisP);
         }
-        float height = bitmap.getHeight();
-        float f3 = this.hu;
-        blit(canvas, bitmap, f, f2 + (height * f3 * 0.55f), f3 * 1.1f, 1.0f, 1.0f, this.bp);
+        // sparkle trail streaming behind her flight path
+        for (int minisK = 0; minisK < 8; minisK++) {
+            float minisD = minisHu * ((minisK * 2.6f) + 3.5f);
+            float minisWob = ((float) Math.sin((this.time * 7.0f) - (minisK * 0.8f))) * minisHu * ((minisK * 0.35f) + 1.0f);
+            float minisTw = ((float) Math.sin((this.time * 14.0f) + (minisK * 1.9f))) * 0.5f + 0.5f;
+            minisStar(canvas, f - (minisDir * minisD), f2 + minisWob + (minisK * minisHu * 0.5f), minisHu * (((1.0f - (minisK / 8.0f)) * 1.4f) + 0.3f) * ((minisTw * 0.6f) + 0.6f), minisSparkCols[minisK % 4], (1.0f - (minisK / 8.0f)) * 230.0f * ((minisTw * 0.5f) + 0.5f));
+        }
+        // warm radial aura (cached gradient, rebuilt only when the pixel unit changes)
+        if (this.minisFairySh == null || this.minisFairyKey != minisHu) {
+            this.minisFairyKey = minisHu;
+            this.minisFairySh = new RadialGradient(0.0f, 0.0f, Math.max(1.0f, minisHu * 13.0f), new int[]{-1996492120, 1442837160, 587193000, 16773800}, new float[]{0.0f, 0.3f, 0.65f, 1.0f}, Shader.TileMode.CLAMP);
+        }
+        canvas.save();
+        canvas.translate(f, f2);
+        canvas.scale(minisBreath, minisBreath);
+        this.minisG.setStyle(Paint.Style.FILL);
+        this.minisG.setShader(this.minisFairySh);
+        this.minisG.setAlpha(255);
+        canvas.drawCircle(0.0f, 0.0f, minisHu * 13.0f, this.minisG);
+        this.minisG.setShader(null);
         canvas.restore();
+        // translucent glowing wings, flapping fast
+        float minisFlap = (float) Math.sin(this.time * 26.0f);
+        for (int minisSide = -1; minisSide <= 1; minisSide += 2) {
+            for (int minisW = 0; minisW < 2; minisW++) {
+                float minisWx = f + (minisSide * minisHu * (minisW == 0 ? 3.6f : 2.8f));
+                float minisWy = f2 - (minisHu * (minisW == 0 ? 2.4f : -0.6f));
+                float minisRw = minisHu * (minisW == 0 ? 3.4f : 2.3f);
+                float minisRh = minisHu * (minisW == 0 ? 2.2f : 1.5f) * ((Math.abs(minisFlap) * 0.75f) + 0.25f);
+                canvas.save();
+                canvas.rotate(minisSide * (minisW == 0 ? -28.0f : 22.0f) + (minisSide * minisFlap * 12.0f), minisWx, minisWy);
+                this.minisR.set(minisWx - minisRw, minisWy - minisRh, minisWx + minisRw, minisWy + minisRh);
+                this.minisP.setStyle(Paint.Style.FILL);
+                this.minisP.setColor(minisW == 0 ? -5242881 : -18751);
+                this.minisP.setAlpha(110);
+                canvas.drawOval(this.minisR, this.minisP);
+                this.minisP.setStyle(Paint.Style.STROKE);
+                this.minisP.setStrokeWidth(Math.max(1.0f, minisHu * 0.45f));
+                this.minisP.setColor(-1);
+                this.minisP.setAlpha(170);
+                canvas.drawOval(this.minisR, this.minisP);
+                this.minisP.setStyle(Paint.Style.FILL);
+                canvas.restore();
+            }
+        }
+        Bitmap bitmap = this.bmFairy[((int) (this.time * 10.0f)) % 2];
+        if (bitmap != null) {
+            canvas.save();
+            if (this.fairyDir < 0.0f) {
+                canvas.scale(-1.0f, 1.0f, f, f2);
+            }
+            float height = bitmap.getHeight();
+            float f3 = this.hu;
+            blit(canvas, bitmap, f, f2 + (height * f3 * 0.55f), f3 * 1.1f, 1.0f, 1.0f, this.bp);
+            canvas.restore();
+        }
+        // orbiting twinkles
+        for (int minisK = 0; minisK < 3; minisK++) {
+            double minisAng = (this.time * 2.4f) + (minisK * 2.0943951023931953d);
+            float minisTw = ((float) Math.sin((this.time * 9.0f) + (minisK * 2.0f))) * 0.5f + 0.5f;
+            minisStar(canvas, f + (((float) Math.cos(minisAng)) * minisHu * 8.0f), f2 + (((float) Math.sin(minisAng)) * minisHu * 4.5f), minisHu * ((minisTw * 0.9f) + 0.5f), minisSparkCols[(minisK + 1) % 4], (minisTw * 150.0f) + 80.0f);
+        }
         if (this.rnd.nextInt(3) == 0) {
             Fx fx = new Fx();
             fx.x = f;
@@ -5482,10 +6259,29 @@ public class GameView extends View implements Runnable {
         String str;
         StringBuilder append;
         int i2;
+        if (this.W <= 0 || this.H <= 0) {
+            return;
+        }
+        // arena backdrop: slow rotating rays and drifting motes behind the minigame
+        minisRays(canvas, this.W / 2.0f, this.H * 0.48f, this.W * 0.05f, this.W * 0.75f, 14, this.time * 0.15f, 0.5f, -11430, 16.0f);
+        for (int minisK = 0; minisK < 16; minisK++) {
+            float minisU = ((this.time * ((minisHash(minisK) * 0.04f) + 0.02f)) + minisHash(minisK + 50)) % 1.0f;
+            float minisMx = (minisHash(minisK + 20) * this.W) + (((float) Math.sin((this.time * 0.9f) + minisK)) * this.pad);
+            float minisMs = this.hu * ((minisHash(minisK + 3) * 0.7f) + 0.5f);
+            this.minisP.setStyle(Paint.Style.FILL);
+            this.minisP.setColor(EL_COLOR[minisK % 4]);
+            this.minisP.setAlpha(minisA(((float) Math.sin(minisU * 3.141592653589793d)) * 90.0f));
+            float minisMy = this.H * (0.95f - (minisU * 0.8f));
+            canvas.drawRect(minisMx - minisMs, minisMy - minisMs, minisMx + minisMs, minisMy + minisMs, this.minisP);
+        }
         this.tp.setTextAlign(Paint.Align.CENTER);
-        this.tp.setColor(-11430);
         this.tp.setTextSize(this.pad * 3.0f);
         this.tp.setFakeBoldText(true);
+        // title with a chunky drop shadow and a warm glow
+        minisHalo(canvas, this.W / 2.0f, (this.H * 0.17f) - (this.pad * 1.0f), this.pad * 7.0f, -11430, 70.0f);
+        this.tp.setColor(-15331286);
+        canvas.drawText(MINI_NAME[this.miniType], (this.W / 2.0f) + (this.hu * 1.3f), (this.H * 0.17f) + (this.hu * 1.3f), this.tp);
+        this.tp.setColor(-11430);
         canvas.drawText(MINI_NAME[this.miniType], this.W / 2.0f, this.H * 0.17f, this.tp);
         this.tp.setFakeBoldText(false);
         this.tp.setColor(-4609816);
@@ -5494,8 +6290,28 @@ public class GameView extends View implements Runnable {
         int i3 = OV_NONE;
         while (i3 < 3) {
             float f = (this.W / 2.0f) + ((i3 - 1) * this.pad * 4.0f);
-            this.p.setColor(i3 < this.miniRound ? -11430 : -12963760);
+            boolean minisDone = i3 < this.miniRound;
+            if (minisDone) {
+                minisHalo(canvas, f, this.H * 0.25f, this.pad * 2.2f, -11430, 150.0f);
+            }
+            this.minisP.setStyle(Paint.Style.FILL);
+            this.minisP.setColor(-15331286);
+            this.minisP.setAlpha(150);
+            canvas.drawCircle(f + (this.hu * 0.8f), (this.H * 0.25f) + (this.hu * 0.8f), this.pad * 1.0f, this.minisP);
+            this.p.setColor(minisDone ? -11430 : -12963760);
             canvas.drawCircle(f, this.H * 0.25f, this.pad * 1.0f, this.p);
+            this.minisP.setColor(-1);
+            this.minisP.setAlpha(minisDone ? 200 : 60);
+            canvas.drawRect(f - (this.pad * 0.5f), (this.H * 0.25f) - (this.pad * 0.6f), f - (this.pad * 0.1f), (this.H * 0.25f) - (this.pad * 0.2f), this.minisP);
+            if (i3 == this.miniRound && this.miniPhase == 1) {
+                // current round: pulsing ring
+                this.minisP.setStyle(Paint.Style.STROKE);
+                this.minisP.setStrokeWidth(Math.max(1.0f, this.pad * 0.25f));
+                this.minisP.setColor(-11430);
+                this.minisP.setAlpha(minisA((((float) Math.sin(this.time * 6.0f)) * 90.0f) + 150.0f));
+                canvas.drawCircle(f, this.H * 0.25f, this.pad * ((((float) Math.sin(this.time * 6.0f)) * 0.15f) + 1.45f), this.minisP);
+                this.minisP.setStyle(Paint.Style.FILL);
+            }
             i3++;
         }
         int i4 = this.miniPhase;
@@ -5503,7 +6319,26 @@ public class GameView extends View implements Runnable {
             this.tp.setColor(-1);
             this.tp.setTextSize(this.pad * 3.5f);
             this.tp.setFakeBoldText(true);
+            if (this.miniT >= 0.7f) {
+                // "go!" slam: scale pop, shockwave rings, burst rays
+                float minisGo = Math.min(1.0f, (this.miniT - 0.7f) * 3.0f);
+                this.tp.setTextSize(this.pad * 3.5f * ((0.6f * (1.0f - minisGo) * (1.0f - minisGo)) + 1.0f));
+                minisRays(canvas, this.W / 2.0f, (this.H * 0.5f) - (this.pad * 1.2f), this.pad * 2.0f, this.W * ((0.3f * minisGo) + 0.25f), 16, this.time * 0.5f, 0.4f, -11430, 120.0f * (1.0f - (minisGo * 0.6f)));
+                this.minisP.setStyle(Paint.Style.STROKE);
+                for (int minisK = 0; minisK < 2; minisK++) {
+                    float minisGr = Math.min(1.0f, minisGo + (minisK * 0.25f));
+                    this.minisP.setStrokeWidth(Math.max(1.0f, this.pad * 0.6f * (1.0f - minisGr)));
+                    this.minisP.setColor(minisK == 0 ? -1 : -11430);
+                    this.minisP.setAlpha(minisA(220.0f * (1.0f - minisGr)));
+                    canvas.drawCircle(this.W / 2.0f, (this.H * 0.5f) - (this.pad * 1.2f), this.W * 0.45f * minisGr, this.minisP);
+                }
+                this.minisP.setStyle(Paint.Style.FILL);
+            } else {
+                // "get ready": gentle breathing
+                this.tp.setAlpha(minisA((((float) Math.sin(this.time * 6.0f)) * 60.0f) + 195.0f));
+            }
             canvas.drawText(this.miniT < 0.7f ? "Приготовься..." : "Начали!", this.W / 2.0f, this.H * 0.5f, this.tp);
+            this.tp.setAlpha(255);
             this.tp.setFakeBoldText(false);
             if (bossFight()) {
                 this.tp.setColor(-25958);
@@ -5524,13 +6359,33 @@ public class GameView extends View implements Runnable {
             canvas.drawText("Результат", this.W / 2.0f, this.H * 0.38f, this.tp);
             this.tp.setTextSize(this.pad * 5.0f);
             this.tp.setColor(-11430);
-            StringBuilder sb = new StringBuilder();
+            // result stars pop in one by one, earned ones glow under spinning rays
+            float minisStarW = this.tp.measureText("★");
+            float minisSy = (this.H * 0.47f) - (this.pad * 1.8f);
+            if (this.miniScore > 0) {
+                minisRays(canvas, this.W / 2.0f, minisSy, this.pad * 2.0f, this.W * 0.42f, 12, this.time * 0.5f, 0.45f, -11430, (this.miniScore * 22.0f) + 20.0f);
+            }
             int i5 = OV_NONE;
             while (i5 < 3) {
-                sb.append(i5 < this.miniScore ? "★" : "☆");
+                float minisAge = this.miniT - (i5 * 0.18f);
+                if (minisAge > 0.0f) {
+                    boolean minisGot = i5 < this.miniScore;
+                    float minisPop = minisAge < 0.12f ? (minisAge / 0.12f) * 1.4f : 1.4f - Math.min(0.4f, (minisAge - 0.12f) * 3.0f);
+                    float minisSx = (this.W / 2.0f) + ((i5 - 1) * minisStarW);
+                    if (minisGot) {
+                        minisHalo(canvas, minisSx, minisSy, minisStarW * 0.9f * minisPop, -11430, 200.0f);
+                        float minisTw = ((float) Math.sin((this.time * 5.0f) + (i5 * 2.0f))) * 0.5f + 0.5f;
+                        minisStar(canvas, (minisStarW * 0.45f) + minisSx, minisSy - (minisStarW * 0.4f), this.hu * ((minisTw * 1.5f) + 0.5f), -1, minisTw * 230.0f);
+                    }
+                    this.tp.setTextSize(this.pad * 5.0f * minisPop);
+                    this.tp.setColor(-15331286);
+                    canvas.drawText(minisGot ? "★" : "☆", (this.hu * 1.4f) + minisSx, (this.H * 0.47f) + (this.hu * 1.4f), this.tp);
+                    this.tp.setColor(minisGot ? -11430 : -7569238);
+                    canvas.drawText(minisGot ? "★" : "☆", minisSx, this.H * 0.47f, this.tp);
+                }
                 i5++;
             }
-            canvas.drawText(sb.toString(), this.W / 2.0f, this.H * 0.47f, this.tp);
+            this.tp.setTextSize(this.pad * 5.0f);
             this.tp.setTextSize(this.pad * 2.0f);
             this.tp.setColor(-1);
             String[] split = this.miniReward.split("\n");
@@ -5571,32 +6426,75 @@ public class GameView extends View implements Runnable {
             float f8 = f5 - f7;
             float f9 = f5 + f7;
             this.r.set(f3, f8, f3 + f4, f9);
+            // bar frame: drop shadow, bevelled track, tick marks
+            this.minisR.set(f3 - (this.pad * 0.4f), f8 - (this.pad * 0.4f), f3 + f4 + (this.pad * 0.4f), f9 + (this.pad * 0.7f));
+            this.minisP.setStyle(Paint.Style.FILL);
+            this.minisP.setColor(-15331286);
+            this.minisP.setAlpha(170);
+            canvas.drawRoundRect(this.minisR, this.pad * 1.3f, this.pad * 1.3f, this.minisP);
             this.p.setColor(-14016440);
             RectF rectF = this.r;
             float f10 = this.pad;
             canvas.drawRoundRect(rectF, f10, f10, this.p);
+            this.minisP.setColor(-16777216);
+            this.minisP.setAlpha(70);
+            canvas.drawRect(f3 + f10, f8, (f3 + f4) - f10, (f6 * 0.22f) + f8, this.minisP);
+            this.minisP.setColor(-1);
+            this.minisP.setAlpha(40);
+            for (int minisK = 1; minisK < 10; minisK++) {
+                float minisX = (f4 * minisK * 0.1f) + f3;
+                canvas.drawRect(minisX - (this.hu * 0.4f), f9 - (f6 * 0.25f), (this.hu * 0.4f) + minisX, f9 - (f6 * 0.08f), this.minisP);
+            }
             if (this.miniPhase == 1) {
                 RectF rectF2 = this.r;
                 float f11 = this.zoneL;
                 rectF2.set((f4 * f11) + f3, f8, ((f11 + this.zoneW) * f4) + f3, f9);
+                // target zone glows and breathes
+                float minisZp = (((float) Math.sin(this.time * 7.0f)) * 0.5f) + 0.5f;
+                minisHalo(canvas, this.r.centerX(), this.r.centerY(), Math.max(this.r.width(), f6) * 0.9f, -12673970, (minisZp * 80.0f) + 90.0f);
                 this.p.setColor(-12673970);
                 canvas.drawRect(this.r, this.p);
+                minisGloss(canvas, this.r, 0.0f, 0.8f);
                 float f12 = ((this.zoneL + (this.zoneW / 2.0f)) * f4) + f3;
+                minisHalo(canvas, f12, f5, f6 * 0.6f, -11430, (minisZp * 120.0f) + 80.0f);
                 this.p.setColor(-11430);
                 float f13 = 0.035f * f4;
                 i2 = -1;
                 canvas.drawRect(f12 - f13, f8, f13 + f12, f9, this.p);
+                minisStar(canvas, f12, f8 - (this.pad * 0.6f), this.hu * ((minisZp * 1.2f) + 1.0f), -11430, 230.0f);
                 float f14 = f3 + (f4 * this.swPos);
+                // cursor: glow halo, pointer tips and a shine
+                float f16 = f6 * 0.85f;
+                minisHalo(canvas, f14, f5, f6 * 0.9f, -1, 140.0f);
                 this.p.setColor(-1);
                 float f15 = this.pad;
-                float f16 = f6 * 0.85f;
                 canvas.drawRect(f14 - (f15 * 0.45f), f5 - f16, f14 + (f15 * 0.45f), f5 + f16, this.p);
+                this.minisPath.reset();
+                this.minisPath.moveTo(f14 - (f15 * 1.1f), (f5 - f16) - (f15 * 0.9f));
+                this.minisPath.lineTo((f15 * 1.1f) + f14, (f5 - f16) - (f15 * 0.9f));
+                this.minisPath.lineTo(f14, f5 - f16);
+                this.minisPath.close();
+                this.minisPath.moveTo(f14 - (f15 * 1.1f), f5 + f16 + (f15 * 0.9f));
+                this.minisPath.lineTo((f15 * 1.1f) + f14, f5 + f16 + (f15 * 0.9f));
+                this.minisPath.lineTo(f14, f5 + f16);
+                this.minisPath.close();
+                this.minisP.setStyle(Paint.Style.FILL);
+                this.minisP.setColor(-1);
+                this.minisP.setAlpha(255);
+                canvas.drawPath(this.minisPath, this.minisP);
             } else {
                 i2 = -1;
             }
+            // floating, gleaming sword
+            float minisBob = ((float) Math.sin(this.time * 2.5f)) * this.pad * 0.6f;
+            minisHalo(canvas, this.W / 2.0f, ((this.H * 0.4f) - (this.pad * 2.0f)) + minisBob, this.pad * 5.0f, -10825217, 110.0f);
             this.tp.setTextSize(this.pad * 6.0f);
             this.tp.setColor(i2);
-            canvas.drawText("🗡", this.W / 2.0f, this.H * 0.4f, this.tp);
+            canvas.drawText("🗡", this.W / 2.0f, (this.H * 0.4f) + minisBob, this.tp);
+            float minisGt = ((this.time * 0.8f) % 1.0f);
+            if (minisGt < 0.3f) {
+                minisStar(canvas, (this.W / 2.0f) + (this.pad * 1.5f), ((this.H * 0.4f) - (this.pad * 4.0f)) + minisBob, this.hu * 2.5f * ((float) Math.sin((minisGt / 0.3f) * 3.141592653589793d)), -1, 240.0f);
+            }
             this.tp.setTextSize(this.pad * 1.8f);
             this.tp.setColor(-7569238);
             canvas.drawText("тапни в любом месте", this.W / 2.0f, this.H * 0.56f, this.tp);
@@ -5607,6 +6505,12 @@ public class GameView extends View implements Runnable {
                 this.tp.setColor(-1);
                 canvas.drawText("Враг: " + EL_FOE[this.elFoe], this.W / 2.0f, this.H * 0.3f, this.tp);
                 this.tp.setTextSize(this.pad * 5.0f);
+                if (this.elFoe >= 0 && this.elFoe < EL_COLOR.length) {
+                    // menacing aura around the enemy element
+                    float minisFp = (((float) Math.sin(this.time * 5.0f)) * 0.5f) + 0.5f;
+                    minisRays(canvas, this.W / 2.0f, (this.H * 0.37f) - (this.pad * 1.7f), this.pad * 1.5f, this.pad * ((minisFp * 1.5f) + 5.5f), 10, -this.time * 0.9f, 0.35f, EL_COLOR[this.elFoe], 90.0f);
+                    minisHalo(canvas, this.W / 2.0f, (this.H * 0.37f) - (this.pad * 1.7f), this.pad * ((minisFp * 0.8f) + 4.0f), EL_COLOR[this.elFoe], 190.0f);
+                }
                 canvas.drawText(EL_ICON[this.elFoe], this.W / 2.0f, this.H * 0.37f, this.tp);
                 float max = Math.max(0.0f, this.elTime / (3.6f - (Math.min(this.miniRound, 2) * 0.8f)));
                 this.p.setColor(-14016440);
@@ -5618,6 +6522,21 @@ public class GameView extends View implements Runnable {
                 int i12 = this.W;
                 int i13 = this.H;
                 canvas.drawRect(i12 * 0.2f, i13 * 0.39f, (i12 * 0.2f) + (i12 * 0.6f * max), (i13 * 0.39f) + this.pad, this.p);
+                // timer: gloss, burning fuse tip, alarm blink when low
+                this.minisR.set(i12 * 0.2f, i13 * 0.39f, (i12 * 0.2f) + (i12 * 0.6f * Math.min(1.0f, max)), (i13 * 0.39f) + this.pad);
+                minisGloss(canvas, this.minisR, 0.0f, 1.0f);
+                if (max > 0.0f) {
+                    minisHalo(canvas, this.minisR.right, this.minisR.centerY(), this.pad * 1.6f, max > 0.35f ? -10825217 : -42406, 200.0f);
+                    minisStar(canvas, this.minisR.right, this.minisR.centerY(), this.hu * ((((float) Math.sin(this.time * 20.0f)) * 0.6f) + 1.6f), -1, 230.0f);
+                }
+                if (max <= 0.35f) {
+                    this.minisP.setStyle(Paint.Style.STROKE);
+                    this.minisP.setStrokeWidth(Math.max(1.0f, this.pad * 0.25f));
+                    this.minisP.setColor(-42406);
+                    this.minisP.setAlpha(minisA((((float) Math.sin(this.time * 14.0f)) * 100.0f) + 140.0f));
+                    canvas.drawRect((i12 * 0.2f) - this.hu, (i13 * 0.39f) - this.hu, (i12 * 0.8f) + this.hu, (i13 * 0.39f) + this.pad + this.hu, this.minisP);
+                    this.minisP.setStyle(Paint.Style.FILL);
+                }
             } else {
                 i = -4609816;
                 if (!z2) {
@@ -5644,6 +6563,23 @@ public class GameView extends View implements Runnable {
                 int i17 = this.H;
                 rectF3.set(padCX - (i16 * 0.17f), padCY - (i17 * 0.07f), (i16 * 0.17f) + padCX, (i17 * 0.07f) + padCY);
                 boolean z3 = !z2 && this.runeLit == i15;
+                // pad depth: drop shadow, lit-rune glow + ripple
+                this.minisR.set(this.r.left, this.r.top + (this.pad * 0.6f), this.r.right, this.r.bottom + (this.pad * 0.6f));
+                this.minisP.setStyle(Paint.Style.FILL);
+                this.minisP.setColor(-15331286);
+                this.minisP.setAlpha(160);
+                canvas.drawRoundRect(this.minisR, this.pad * 2.0f, this.pad * 2.0f, this.minisP);
+                if (z3) {
+                    minisHalo(canvas, padCX, padCY, this.W * 0.24f, EL_COLOR[i15], 255.0f);
+                    float minisRp = (this.time * 2.5f) % 1.0f;
+                    this.minisP.setStyle(Paint.Style.STROKE);
+                    this.minisP.setStrokeWidth(Math.max(1.0f, this.pad * 0.4f * (1.0f - minisRp)));
+                    this.minisP.setColor(EL_COLOR[i15]);
+                    this.minisP.setAlpha(minisA(230.0f * (1.0f - minisRp)));
+                    this.minisR.set(this.r.left - (this.pad * 2.0f * minisRp), this.r.top - (this.pad * 2.0f * minisRp), this.r.right + (this.pad * 2.0f * minisRp), this.r.bottom + (this.pad * 2.0f * minisRp));
+                    canvas.drawRoundRect(this.minisR, this.pad * 2.0f, this.pad * 2.0f, this.minisP);
+                    this.minisP.setStyle(Paint.Style.FILL);
+                }
                 this.p.setColor(z3 ? -1 : EL_COLOR[i15]);
                 if (!z2 && !z3) {
                     this.p.setAlpha(150);
@@ -5652,9 +6588,19 @@ public class GameView extends View implements Runnable {
                 float f17 = this.pad;
                 canvas.drawRoundRect(rectF4, f17 * 2.0f, f17 * 2.0f, this.p);
                 this.p.setAlpha(255);
+                minisGloss(canvas, this.r, f17 * 2.0f, z3 ? 0.6f : 1.0f);
+                // inner rim in the element colour
+                this.minisP.setStyle(Paint.Style.STROKE);
+                this.minisP.setStrokeWidth(Math.max(1.0f, this.hu * 0.8f));
+                this.minisP.setColor(z3 ? EL_COLOR[i15] : -1);
+                this.minisP.setAlpha(z3 ? 255 : 70);
+                this.minisR.set(this.r.left + this.hu * 1.5f, this.r.top + this.hu * 1.5f, this.r.right - this.hu * 1.5f, this.r.bottom - this.hu * 1.5f);
+                canvas.drawRoundRect(this.minisR, f17 * 1.6f, f17 * 1.6f, this.minisP);
+                this.minisP.setStyle(Paint.Style.FILL);
                 this.tp.setTextSize(this.pad * 4.5f);
                 this.tp.setColor(-1);
-                canvas.drawText(EL_ICON[i15], padCX, (this.pad * IMPACT) + padCY, this.tp);
+                float minisIb = ((float) Math.sin((this.time * 3.0f) + (i15 * 1.6f))) * this.pad * 0.35f;
+                canvas.drawText(EL_ICON[i15], padCX, (this.pad * IMPACT) + padCY + minisIb, this.tp);
                 if (z2) {
                     this.tp.setTextSize(this.pad * 1.5f);
                     canvas.drawText(EL_NAME[i15], padCX, padCY + (this.H * 0.055f), this.tp);
@@ -5669,10 +6615,18 @@ public class GameView extends View implements Runnable {
             }
         }
         if (this.miniMsgT > 0.0f) {
-            this.tp.setTextSize(this.pad * 3.0f);
+            // feedback message slams in with an overshoot and a dark outline
+            float minisMa = Math.max(0.0f, 0.9f - this.miniMsgT);
+            float minisMs = minisMa < 0.08f ? (minisMa / 0.08f) * 0.8f + 0.6f : 1.4f - Math.min(0.4f, (minisMa - 0.08f) * 3.0f);
+            this.tp.setTextSize(this.pad * 3.0f * minisMs);
             this.tp.setFakeBoldText(true);
+            int minisMalpha = (int) (Math.min(1.0f, this.miniMsgT * 2.0f) * 255.0f);
+            minisHalo(canvas, this.W / 2.0f, (this.H * 0.88f) - (this.pad * 1.0f), this.pad * 6.0f * minisMs, this.miniMsgColor, minisMalpha * 0.5f);
+            this.tp.setColor(-15331286);
+            this.tp.setAlpha(minisMalpha);
+            canvas.drawText(this.miniMsg, (this.W / 2.0f) + (this.hu * 1.3f), (this.H * 0.88f) + (this.hu * 1.3f), this.tp);
             this.tp.setColor(this.miniMsgColor);
-            this.tp.setAlpha((int) (Math.min(1.0f, this.miniMsgT * 2.0f) * 255.0f));
+            this.tp.setAlpha(minisMalpha);
             canvas.drawText(this.miniMsg, this.W / 2.0f, this.H * 0.88f, this.tp);
             this.tp.setAlpha(255);
             this.tp.setFakeBoldText(false);
@@ -8105,6 +9059,7 @@ public class GameView extends View implements Runnable {
         float f4 = i5 * 0.66f;
         int max = Math.max(1, i3 - 3);
         int min = z2 ? i3 + 5 : Math.min(TOWER_TOP, max + 10);
+        minisTowerBack(canvas, f, f2, f4);
         int i6 = max;
         while (true) {
             if (i6 > min) {
@@ -8115,6 +9070,9 @@ public class GameView extends View implements Runnable {
             this.r.set(f - f6, (f5 - f3) + (this.pad * 0.25f), f + f6, f5);
             boolean z3 = i6 <= this.towerFloor;
             boolean z4 = i6 == i3;
+            if (z4) {
+                minisHalo(canvas, f, this.r.centerY(), f2 * 0.95f, -24512, (((float) Math.sin(this.time * 5.0f)) * 60.0f) + 140.0f);
+            }
             Paint paint = this.p;
             if (z3) {
                 i2 = -9807238;
@@ -8128,6 +9086,7 @@ public class GameView extends View implements Runnable {
             }
             paint.setColor(i2);
             canvas.drawRect(this.r, this.p);
+            minisTowerFloor(canvas, this.r, i6, z3, z4, f2);
             this.p.setColor(855638016);
             int i7 = i6;
             int i8 = min;
@@ -8155,22 +9114,56 @@ public class GameView extends View implements Runnable {
         float f9 = f4 - (((i9 - max) + 1) * f3);
         if (z5 || i9 != TOWER_TOP) {
             i = -4609816;
+            // tower keeps rising: ghost floors fading into the night
+            minisTowerFade(canvas, f8, f2, f9, f3);
         } else {
-            Path path = new Path();
+            Path path = this.minisPath;
+            path.reset();
             float f10 = f2 * 0.6f;
+            // flag on the roof peak (drawn first so the roof overlaps the pole base)
+            minisFlag(canvas, f8, f9 - (2.4f * f3), f3 * 1.5f, -26051);
+            path.reset();
             path.moveTo(f8 - f10, f9 + (this.pad * 0.3f));
             path.lineTo(f8, f9 - (2.4f * f3));
             path.lineTo(f8 + f10, f9 + (this.pad * 0.3f));
             path.close();
             this.p.setColor(-7722422);
             canvas.drawPath(path, this.p);
+            // roof shading: lit left slope, tile rows
+            path.reset();
+            path.moveTo(f8 - f10, f9 + (this.pad * 0.3f));
+            path.lineTo(f8, f9 - (2.4f * f3));
+            path.lineTo(f8, f9 + (this.pad * 0.3f));
+            path.close();
+            this.minisP.setStyle(Paint.Style.FILL);
+            this.minisP.setColor(-1);
+            this.minisP.setAlpha(36);
+            canvas.drawPath(path, this.minisP);
+            this.minisP.setColor(-16777216);
+            this.minisP.setAlpha(50);
+            for (int minisK = 1; minisK < 4; minisK++) {
+                float minisU = minisK / 4.0f;
+                float minisRy = (f9 + (this.pad * 0.3f)) - ((((2.4f * f3) + (this.pad * 0.3f)) * minisU));
+                float minisHw = f10 * (1.0f - minisU);
+                canvas.drawRect(f8 - minisHw, minisRy - (this.hu * 0.4f), f8 + minisHw, (this.hu * 0.4f) + minisRy, this.minisP);
+            }
             float f11 = this.hu * 0.55f;
             this.p.setColor(-5720);
             this.p.setAlpha((int) ((Math.sin(this.time * 3.0f) * 50.0d) + 90.0d));
             canvas.drawCircle(f8, f9 - (0.9f * f3), 9.0f * f11, this.p);
             this.p.setAlpha(255);
+            minisHalo(canvas, f8, f9 - (0.9f * f3), 14.0f * f11, -26051, 110.0f);
             i = -4609816;
-            blit(canvas, this.bmPrincess, f8, f9 - (f3 * 0.1f), f11, 1.0f, 1.0f, this.bp);
+            if (this.bmPrincess != null) {
+                blit(canvas, this.bmPrincess, f8, f9 - (f3 * 0.1f), f11, 1.0f, 1.0f, this.bp);
+            }
+            // little pixel hearts drifting up from the princess
+            for (int minisK = 0; minisK < 4; minisK++) {
+                float minisU = ((this.time * 0.4f) + (minisK * 0.25f)) % 1.0f;
+                float minisHx = f8 + (((float) Math.sin((this.time * 2.0f) + (minisK * 1.7f))) * f11 * 8.0f);
+                float minisHy = (f9 - (f3 * 0.8f)) - (minisU * f3 * 2.5f);
+                minisHeart(canvas, minisHx, minisHy, f11 * 0.9f, ((float) Math.sin(minisU * 3.141592653589793d)) * 220.0f);
+            }
             this.tp.setTextSize(this.pad * 2.0f);
             canvas.drawText("💗", f8 + (f11 * 10.0f), f9 - (f3 * 1.6f), this.tp);
         }
@@ -8178,7 +9171,17 @@ public class GameView extends View implements Runnable {
         this.tp.setTextSize(this.pad * 1.7f);
         this.tp.setColor(-7569238);
         canvas.drawText("Этаж " + i3 + (z5 ? "" : " из 20"), f12, this.H * 0.25f, this.tp);
-        blit(canvas, this.bmBoss[towerSprite(i3)], f12, this.H * 0.37f, this.hu * IMPACT, 1.0f, 1.0f, this.bp);
+        // boss preview: ominous rays, glow, pedestal shadow and a breathing idle
+        float minisBp = (((float) Math.sin(this.time * 2.2f)) * 0.5f) + 0.5f;
+        minisRays(canvas, f12, this.H * 0.33f, this.pad * 2.0f, this.W * 0.2f, 10, this.time * 0.3f, 0.35f, -30070, 50.0f + (minisBp * 30.0f));
+        minisHalo(canvas, f12, this.H * 0.33f, this.W * 0.15f, -38294, 110.0f + (minisBp * 40.0f));
+        this.minisP.setStyle(Paint.Style.FILL);
+        this.minisP.setColor(-16777216);
+        this.minisP.setAlpha(110);
+        this.minisR.set(f12 - (this.W * 0.1f), (this.H * 0.37f) - (this.pad * 0.6f), (this.W * 0.1f) + f12, (this.H * 0.37f) + (this.pad * 0.6f));
+        canvas.drawOval(this.minisR, this.minisP);
+        float minisBreath = minisBp * 0.04f;
+        blit(canvas, this.bmBoss[towerSprite(i3)], f12, this.H * 0.37f, this.hu * IMPACT, 1.0f - (minisBreath * 0.5f), 1.0f + minisBreath, this.bp);
         this.tp.setFakeBoldText(true);
         this.tp.setTextSize(this.pad * 2.0f);
         this.tp.setColor(-30070);
@@ -8215,6 +9218,7 @@ public class GameView extends View implements Runnable {
         RectF rectF2 = this.towerClose;
         float f14 = this.pad;
         canvas.drawRoundRect(rectF2, f14 * 1.5f, f14 * 1.5f, this.p);
+        minisGloss(canvas, this.towerClose, f14 * 1.5f, 1.0f);
         this.tp.setColor(-1);
         this.tp.setTextSize(this.pad * 2.2f);
         canvas.drawText("Назад", this.towerClose.centerX(), this.towerClose.centerY() + (this.pad * 0.8f), this.tp);
@@ -8223,10 +9227,33 @@ public class GameView extends View implements Runnable {
         float f15 = this.pad;
         int i12 = this.H;
         rectF3.set((i11 / 2.0f) + (f15 * 1.5f), i12 * 0.74f, i11 - (f15 * 3.0f), i12 * 0.82f);
+        // assault button: pulsing war-glow, gloss and a sweeping glint
+        float minisGp = (((float) Math.sin(this.time * 4.0f)) * 0.5f) + 0.5f;
+        minisHalo(canvas, this.towerGo.centerX(), this.towerGo.centerY(), (this.towerGo.width() * 0.62f) + (minisGp * this.pad), -4688342, (minisGp * 90.0f) + 90.0f);
         this.p.setColor(-4688342);
         RectF rectF4 = this.towerGo;
         float f16 = this.pad;
         canvas.drawRoundRect(rectF4, f16 * 1.5f, f16 * 1.5f, this.p);
+        minisGloss(canvas, this.towerGo, f16 * 1.5f, 1.0f);
+        this.minisP.setStyle(Paint.Style.STROKE);
+        this.minisP.setStrokeWidth(Math.max(1.0f, f16 * 0.3f));
+        this.minisP.setColor(-11430);
+        this.minisP.setAlpha(minisA((minisGp * 140.0f) + 90.0f));
+        canvas.drawRoundRect(this.towerGo, f16 * 1.5f, f16 * 1.5f, this.minisP);
+        this.minisP.setStyle(Paint.Style.FILL);
+        float minisSw = ((this.time * 0.5f) % 1.0f) * 1.6f;
+        if (minisSw <= 1.0f) {
+            float minisSx = this.towerGo.left + (f16 * 1.5f) + ((this.towerGo.width() - (f16 * 3.0f)) * minisSw);
+            this.minisP.setColor(-1);
+            this.minisP.setAlpha(minisA(((float) Math.sin(minisSw * 3.141592653589793d)) * 90.0f));
+            this.minisPath.reset();
+            this.minisPath.moveTo(minisSx, this.towerGo.top + (f16 * 0.3f));
+            this.minisPath.lineTo((f16 * 1.2f) + minisSx, this.towerGo.top + (f16 * 0.3f));
+            this.minisPath.lineTo(minisSx - (f16 * 0.3f), this.towerGo.bottom - (f16 * 0.3f));
+            this.minisPath.lineTo(minisSx - (f16 * 1.5f), this.towerGo.bottom - (f16 * 0.3f));
+            this.minisPath.close();
+            canvas.drawPath(this.minisPath, this.minisP);
+        }
         this.tp.setFakeBoldText(true);
         canvas.drawText("⚔ Штурм!", this.towerGo.centerX(), this.towerGo.centerY() + (this.pad * 0.8f), this.tp);
         this.tp.setFakeBoldText(false);
