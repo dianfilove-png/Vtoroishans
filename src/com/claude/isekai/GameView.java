@@ -436,6 +436,9 @@ public class GameView extends View implements Runnable {
         float vy;
         float x;
         float y;
+        float fxBorn;
+        int fxKind;
+        float fxRot;
 
         Fx() {
         }
@@ -716,6 +719,9 @@ public class GameView extends View implements Runnable {
     }
 
     void addFloat(float f, float f2, String str, int i, float f3) {
+        if (i == -1 || i == -42406) {
+            fxTapImpact(i == -42406);
+        }
         if (this.optNum || !(i == -1 || i == -42406)) {
             int i2 = i == -1 ? 4 : i == -42406 ? 2 : 3;
             Iterator<Fx> it = this.floats.iterator();
@@ -1244,6 +1250,354 @@ public class GameView extends View implements Runnable {
         return bossLimit() * (trait() == 4 ? 0.7f : 1.0f);
     }
 
+    // ===== fx: combat FX & feedback (cached paints, helpers) =====
+    static Paint fxMk(boolean stroke) {
+        Paint q = new Paint(1);
+        if (stroke) {
+            q.setStyle(Paint.Style.STROKE);
+            q.setStrokeCap(Paint.Cap.ROUND);
+            q.setStrokeJoin(Paint.Join.ROUND);
+        }
+        return q;
+    }
+
+    static Paint fxMkBmp() {
+        Paint q = new Paint();
+        q.setFilterBitmap(false);
+        q.setDither(false);
+        q.setAntiAlias(false);
+        return q;
+    }
+
+    final Paint fxP = fxMk(false);
+    final Paint fxS = fxMk(true);
+    final Paint fxTxt = fxMk(false);
+    final Paint fxTxtO = fxMk(true);
+    final Paint fxBan = fxMk(false);
+    final Paint fxBmp = fxMkBmp();
+    final LightingColorFilter fxCoinBack = new LightingColorFilter(0xFFB08A60, 0x00100800);
+    final RectF fxR = new RectF();
+    final Path fxPath = new Path();
+    final Random fxRnd = new Random();
+    final ArrayList<Fx> fxSparks = new ArrayList<>();
+    android.graphics.LinearGradient fxBanSh;
+    float fxBanKeyT = -1.0f;
+    float fxBanKeyB = -1.0f;
+    String fxBanStr;
+    float fxBanMax;
+    float fxBanLast;
+
+    static float fxClamp(float v) {
+        return v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v);
+    }
+
+    static float fxOut(float t) {
+        float u = 1.0f - fxClamp(t);
+        return 1.0f - (u * u * u);
+    }
+
+    static float fxBack(float t) {
+        float u = fxClamp(t) - 1.0f;
+        return 1.0f + (3.2f * u * u * u) + (2.2f * u * u);
+    }
+
+    static int fxShade(int c, float k) {
+        int r = Math.min(255, (int) (((c >> 16) & 255) * k));
+        int g = Math.min(255, (int) (((c >> 8) & 255) * k));
+        int b = Math.min(255, (int) ((c & 255) * k));
+        return (-16777216) | (r << 16) | (g << 8) | b;
+    }
+
+    static int fxMix(int c, int d, float t) {
+        float s = fxClamp(t);
+        int r = (int) ((((c >> 16) & 255) * (1.0f - s)) + (((d >> 16) & 255) * s));
+        int g = (int) ((((c >> 8) & 255) * (1.0f - s)) + (((d >> 8) & 255) * s));
+        int b = (int) (((c & 255) * (1.0f - s)) + ((d & 255) * s));
+        return (-16777216) | (r << 16) | (g << 8) | b;
+    }
+
+    // kind 0 = glowing streak spark, 1 = shockwave ring, 2 = tap impact, 3 = crit impact
+    void fxAddSpark(int kind, float x, float y, float vx, float vy, float max, float size, int color, float delay) {
+        Fx fx = new Fx();
+        fx.fxKind = kind;
+        fx.x = x;
+        fx.y = y;
+        fx.vx = vx;
+        fx.vy = vy;
+        fx.max = max;
+        fx.size = size;
+        fx.color = color;
+        fx.fxBorn = this.time + delay;
+        fx.fxRot = fxRnd.nextFloat() * 6.2831855f;
+        this.fxSparks.add(fx);
+        while (this.fxSparks.size() > 140) {
+            this.fxSparks.remove(OV_NONE);
+        }
+    }
+
+    void fxStreaks(float x, float y, int n, int color, float speed, float delay) {
+        float sc = this.W / 1080.0f;
+        for (int k = OV_NONE; k < n; k++) {
+            double a = fxRnd.nextDouble() * 6.283185307179586d;
+            float sp = ((fxRnd.nextFloat() * 0.6f) + 0.5f) * speed * sc;
+            int col = k % 3 == 0 ? -2338 : color;
+            fxAddSpark(OV_NONE, x, y, ((float) Math.cos(a)) * sp, (((float) Math.sin(a)) * sp) - (220.0f * sc), (fxRnd.nextFloat() * 0.2f) + 0.28f, this.hu * ((fxRnd.nextFloat() * 0.5f) + 0.55f), col, delay);
+        }
+    }
+
+    void fxTapImpact(boolean crit) {
+        float jx = (fxRnd.nextFloat() - 0.5f) * this.mobR * 0.4f;
+        float jy = (fxRnd.nextFloat() - 0.5f) * this.mobR * 0.4f;
+        float x = this.mobX + jx;
+        float y = this.mobY + jy;
+        float r = this.pad * (crit ? 4.6f : 2.6f);
+        fxAddSpark(crit ? 3 : 2, x, y, 0.0f, 0.0f, crit ? 0.42f : 0.26f, r, crit ? -11430 : -5720, 0.2f);
+        fxStreaks(x, y, crit ? 9 : 4, crit ? -26051 : -5720, crit ? 1300.0f : 850.0f, 0.2f);
+    }
+
+    void fxDrawSparks(Canvas canvas) {
+        if (this.fxSparks.isEmpty()) {
+            return;
+        }
+        float now = this.time;
+        float g = (this.W / 1080.0f) * 1500.0f;
+        for (int k = this.fxSparks.size() - 1; k >= 0; k--) {
+            Fx s = this.fxSparks.get(k);
+            float t = now - s.fxBorn;
+            if (t >= s.max || t < -2.0f || s.max <= 0.0f) {
+                this.fxSparks.remove(k);
+                continue;
+            }
+            if (t < 0.0f) {
+                continue;
+            }
+            float u = t / s.max;
+            float fade = 1.0f - u;
+            if (s.fxKind == 0) {
+                float e = (float) Math.exp(-3.0f * t);
+                float d = (1.0f - e) / 3.0f;
+                float px = s.x + (s.vx * d);
+                float py = s.y + (s.vy * d) + (0.5f * g * t * t);
+                float cvx = s.vx * e;
+                float cvy = (s.vy * e) + (g * t);
+                float tx = px - (cvx * 0.04f);
+                float ty = py - (cvy * 0.04f);
+                this.fxS.setColor(s.color);
+                this.fxS.setAlpha((int) (80.0f * fade));
+                this.fxS.setStrokeWidth(s.size * 2.6f);
+                canvas.drawLine(tx, ty, px, py, this.fxS);
+                this.fxS.setColor(fxMix(s.color, -1, 0.55f));
+                this.fxS.setAlpha((int) (240.0f * fade));
+                this.fxS.setStrokeWidth(s.size * fade + 1.0f);
+                canvas.drawLine(tx, ty, px, py, this.fxS);
+            } else if (s.fxKind == 1) {
+                float e2 = fxOut(u);
+                float rr = s.size * ((0.85f * e2) + 0.2f);
+                if (u < 0.3f) {
+                    float fl = 1.0f - (u / 0.3f);
+                    this.fxP.setColor(s.color);
+                    this.fxP.setAlpha((int) (90.0f * fl));
+                    canvas.drawCircle(s.x, s.y, rr * 0.75f, this.fxP);
+                    this.fxP.setColor(-1);
+                    this.fxP.setAlpha((int) (200.0f * fl));
+                    canvas.drawCircle(s.x, s.y, rr * 0.32f, this.fxP);
+                }
+                this.fxS.setColor(s.color);
+                this.fxS.setAlpha((int) (110.0f * fade));
+                this.fxS.setStrokeWidth((this.pad * 1.1f * fade) + 1.0f);
+                canvas.drawCircle(s.x, s.y, rr, this.fxS);
+                this.fxS.setColor(fxMix(s.color, -1, 0.6f));
+                this.fxS.setAlpha((int) (220.0f * fade));
+                this.fxS.setStrokeWidth((this.pad * 0.35f * fade) + 1.0f);
+                canvas.drawCircle(s.x, s.y, rr, this.fxS);
+            } else {
+                boolean crit = s.fxKind == 3;
+                float e3 = fxOut(u);
+                float rr2 = s.size * ((0.9f * e3) + 0.15f);
+                if (u < 0.35f) {
+                    float fl2 = 1.0f - (u / 0.35f);
+                    this.fxP.setColor(s.color);
+                    this.fxP.setAlpha((int) (110.0f * fl2));
+                    canvas.drawCircle(s.x, s.y, s.size * 0.55f * ((0.5f * e3) + 0.5f), this.fxP);
+                    this.fxP.setColor(-1);
+                    this.fxP.setAlpha((int) (235.0f * fl2));
+                    canvas.drawCircle(s.x, s.y, s.size * 0.24f * ((0.6f * e3) + 0.4f), this.fxP);
+                }
+                int spikes = crit ? 8 : 6;
+                float step = 6.2831855f / spikes;
+                this.fxS.setColor(fxMix(s.color, -1, 0.5f));
+                this.fxS.setAlpha((int) (230.0f * fade));
+                this.fxS.setStrokeWidth((this.hu * (crit ? 1.3f : 0.9f) * fade) + 1.0f);
+                for (int q = OV_NONE; q < spikes; q++) {
+                    float a = s.fxRot + (q * step);
+                    float ln = (q % 2 == 0 ? 1.0f : 0.62f);
+                    float ca = (float) Math.cos(a);
+                    float sa = (float) Math.sin(a);
+                    float r0 = rr2 * 0.55f;
+                    float r1 = rr2 * ((0.55f * ln) + 0.6f);
+                    canvas.drawLine(s.x + (ca * r0), s.y + (sa * r0), s.x + (ca * r1), s.y + (sa * r1), this.fxS);
+                }
+                this.fxS.setColor(s.color);
+                this.fxS.setAlpha((int) (200.0f * fade));
+                this.fxS.setStrokeWidth((this.pad * (crit ? 0.6f : 0.4f) * fade) + 1.0f);
+                canvas.drawCircle(s.x, s.y, rr2, this.fxS);
+                if (crit && u > 0.15f) {
+                    float u2 = (u - 0.15f) / 0.85f;
+                    this.fxS.setColor(-42406);
+                    this.fxS.setAlpha((int) (160.0f * (1.0f - u2)));
+                    this.fxS.setStrokeWidth((this.pad * 0.3f * (1.0f - u2)) + 1.0f);
+                    canvas.drawCircle(s.x, s.y, s.size * ((0.9f * fxOut(u2)) + 0.2f), this.fxS);
+                }
+            }
+        }
+    }
+
+    void fxDrawBanner(Canvas canvas, float bt) {
+        if (this.banner != this.fxBanStr || bt > this.fxBanLast + 0.05f) {
+            this.fxBanStr = this.banner;
+            this.fxBanMax = bt;
+        }
+        this.fxBanLast = bt;
+        float el = Math.max(0.0f, this.fxBanMax - bt);
+        float vis = Math.min(1.0f, bt) * Math.min(1.0f, el / 0.1f);
+        if (vis <= 0.0f) {
+            return;
+        }
+        float in = Math.min(1.0f, el / 0.42f);
+        float pop = fxBack(in);
+        float pd = this.pad;
+        float bl = pd * 2.0f;
+        float btp = this.battleT + pd;
+        float br = this.W - (pd * 2.0f);
+        float bb = this.battleT + (pd * 5.5f);
+        float cx = this.W / 2.0f;
+        float cy = (btp + bb) / 2.0f;
+        int a = (int) (255.0f * vis);
+        int bc = this.bannerColor;
+        float pulse = (float) ((Math.sin(this.time * 4.0f) * 0.5d) + 0.5d);
+        canvas.save();
+        canvas.translate(0.0f, (1.0f - fxOut(in)) * (-pd) * 3.5f);
+        canvas.scale((0.25f * pop) + 0.75f, (0.5f * pop) + 0.5f, cx, cy);
+        // drop shadow
+        this.fxP.setColor(-16777216);
+        this.fxP.setAlpha((int) (110.0f * vis));
+        this.fxR.set(bl, btp + (pd * 0.5f), br, bb + (pd * 0.5f));
+        canvas.drawRoundRect(this.fxR, pd, pd, this.fxP);
+        // outer glow in banner colour
+        float gl = pd * ((0.25f * pulse) + 0.3f);
+        this.fxP.setColor(bc);
+        this.fxP.setAlpha((int) (((40.0f * pulse) + 35.0f) * vis));
+        this.fxR.set(bl - gl, btp - gl, br + gl, bb + gl);
+        canvas.drawRoundRect(this.fxR, pd + gl, pd + gl, this.fxP);
+        // glossy gradient panel
+        if (this.fxBanSh == null || this.fxBanKeyT != btp || this.fxBanKeyB != bb) {
+            this.fxBanKeyT = btp;
+            this.fxBanKeyB = bb;
+            this.fxBanSh = new android.graphics.LinearGradient(0.0f, btp, 0.0f, bb, new int[]{-12961180, -14674632, -15594458}, new float[]{0.0f, 0.5f, 1.0f}, Shader.TileMode.CLAMP);
+        }
+        this.fxBan.setShader(this.fxBanSh);
+        this.fxBan.setAlpha((int) (235.0f * vis));
+        this.fxR.set(bl, btp, br, bb);
+        canvas.drawRoundRect(this.fxR, pd, pd, this.fxBan);
+        // tinted wash + gloss on upper half
+        this.fxP.setColor(bc);
+        this.fxP.setAlpha((int) (26.0f * vis));
+        canvas.drawRoundRect(this.fxR, pd, pd, this.fxP);
+        this.fxP.setColor(-1);
+        this.fxP.setAlpha((int) (26.0f * vis));
+        this.fxR.set(bl + (pd * 0.45f), btp + (pd * 0.35f), br - (pd * 0.45f), cy - (pd * 0.1f));
+        canvas.drawRoundRect(this.fxR, pd * 0.6f, pd * 0.6f, this.fxP);
+        // shine sweep (on entry, then every few seconds)
+        float sh = el < 0.9f ? el / 0.9f : ((el - 0.9f) % 3.2f) / 0.9f;
+        if (sh < 1.0f) {
+            float sx = bl + (((br - bl) + (pd * 6.0f)) * sh) - (pd * 3.0f);
+            canvas.save();
+            canvas.clipRect(bl + (pd * 0.3f), btp + (pd * 0.2f), br - (pd * 0.3f), bb - (pd * 0.2f));
+            this.fxPath.reset();
+            this.fxPath.moveTo(sx, btp);
+            this.fxPath.lineTo((pd * 1.4f) + sx, btp);
+            this.fxPath.lineTo((pd * 1.4f) + sx - (pd * 2.0f), bb);
+            this.fxPath.lineTo(sx - (pd * 2.0f), bb);
+            this.fxPath.close();
+            this.fxP.setColor(-1);
+            this.fxP.setAlpha((int) (48.0f * vis * (1.0f - Math.abs((sh * 2.0f) - 1.0f))));
+            canvas.drawPath(this.fxPath, this.fxP);
+            canvas.restore();
+        }
+        // double border
+        this.fxS.setStrokeWidth(pd * 0.32f);
+        this.fxS.setColor(bc);
+        this.fxS.setAlpha((int) (((60.0f * pulse) + 195.0f) * vis));
+        this.fxR.set(bl + (pd * 0.16f), btp + (pd * 0.16f), br - (pd * 0.16f), bb - (pd * 0.16f));
+        canvas.drawRoundRect(this.fxR, pd * 0.85f, pd * 0.85f, this.fxS);
+        this.fxS.setStrokeWidth(pd * 0.12f);
+        this.fxS.setColor(-16777216);
+        this.fxS.setAlpha((int) (120.0f * vis));
+        this.fxR.set(bl + (pd * 0.45f), btp + (pd * 0.45f), br - (pd * 0.45f), bb - (pd * 0.45f));
+        canvas.drawRoundRect(this.fxR, pd * 0.6f, pd * 0.6f, this.fxS);
+        // glowing side gems
+        for (int side = OV_NONE; side < 2; side++) {
+            float gx = side == 0 ? bl : br;
+            this.fxP.setColor(bc);
+            this.fxP.setAlpha((int) (((50.0f * pulse) + 40.0f) * vis));
+            canvas.drawCircle(gx, cy, pd * ((0.4f * pulse) + 1.1f), this.fxP);
+            canvas.save();
+            canvas.rotate(45.0f, gx, cy);
+            this.fxP.setColor(fxShade(bc, 0.55f));
+            this.fxP.setAlpha(a);
+            float gs = pd * 0.7f;
+            canvas.drawRect(gx - gs, cy - gs, gx + gs, cy + gs, this.fxP);
+            this.fxP.setColor(bc);
+            this.fxP.setAlpha(a);
+            float gs2 = pd * 0.45f;
+            canvas.drawRect(gx - gs2, cy - gs2, gx + gs2, cy + gs2, this.fxP);
+            this.fxP.setColor(-1);
+            this.fxP.setAlpha((int) (200.0f * vis));
+            canvas.drawRect(gx - gs2, cy - gs2, gx - (gs2 * 0.2f), cy - (gs2 * 0.2f), this.fxP);
+            canvas.restore();
+        }
+        // text with soft drop shadow
+        this.tp.setColor(bc);
+        this.tp.setAlpha(a);
+        this.tp.setTextSize(pd * 2.0f);
+        this.tp.setTextAlign(Paint.Align.CENTER);
+        this.tp.setFakeBoldText(true);
+        this.tp.setShadowLayer(pd * 0.3f, 0.0f, pd * 0.22f, ((int) (220.0f * vis)) << 24);
+        String str = this.banner;
+        drawFit(canvas, str, cx, this.battleT + (4.0f * pd), this.W - (pd * 6.0f));
+        this.tp.clearShadowLayer();
+        this.tp.setAlpha(255);
+        this.tp.setFakeBoldText(false);
+        canvas.restore();
+    }
+
+    void fxFloatText(Canvas canvas, String s, float x, float y, int band) {
+        // band: 0 = solid, 1 = crit (white/yellow/orange), 2 = gold
+        canvas.drawText(s, x, y, this.fxTxtO);
+        if (band == 0) {
+            canvas.drawText(s, x, y, this.fxTxt);
+            return;
+        }
+        float ts = this.fxTxt.getTextSize();
+        int al = this.fxTxt.getAlpha();
+        float top = y - (ts * 0.78f);
+        this.fxTxt.setColor(band == 1 ? -42406 : -3104256);
+        this.fxTxt.setAlpha(al);
+        canvas.drawText(s, x, y, this.fxTxt);
+        canvas.save();
+        canvas.clipRect(x - (this.W * 2.0f), top - ts, x + (this.W * 2.0f), top + (ts * 0.5f));
+        this.fxTxt.setColor(band == 1 ? -16310 : -11430);
+        this.fxTxt.setAlpha(al);
+        canvas.drawText(s, x, y, this.fxTxt);
+        canvas.restore();
+        canvas.save();
+        canvas.clipRect(x - (this.W * 2.0f), top - ts, x + (this.W * 2.0f), top + (ts * 0.2f));
+        this.fxTxt.setColor(band == 1 ? -2338 : -4952);
+        this.fxTxt.setAlpha(al);
+        canvas.drawText(s, x, y, this.fxTxt);
+        canvas.restore();
+    }
+
     void burst(int i, int i2) {
         burstAt(this.mobX, this.mobY, i, i2);
     }
@@ -1265,6 +1619,10 @@ public class GameView extends View implements Runnable {
         }
         while (this.parts.size() > 250) {
             this.parts.remove(OV_NONE);
+        }
+        if (i > 0) {
+            fxAddSpark(1, f, f2, 0.0f, 0.0f, (Math.min(i, 60) * 0.004f) + 0.3f, this.pad * ((Math.min(i, 60) * 0.11f) + 2.6f), i2, 0.0f);
+            fxStreaks(f, f2, Math.min(12, (i / 4) + 2), i2, 1050.0f, 0.0f);
         }
     }
 
@@ -2694,51 +3052,110 @@ public class GameView extends View implements Runnable {
         Iterator<Fx> it = this.famShots.iterator();
         while (it.hasNext()) {
             Fx next = it.next();
+            if (next.max <= 0.0f) {
+                continue;
+            }
             float f3 = next.life / next.max;
             float famX = famX();
             float famY = famY();
+            float fxHu = this.hu;
+            // comet trail: fading, shrinking glow beads behind the shot
+            for (int fxK = 6; fxK >= 1; fxK--) {
+                float fxT = f3 - (fxK * 0.055f);
+                if (fxT > 0.0f) {
+                    float fxBx = famX + ((this.mobX - famX) * fxT);
+                    float fxBy = famY + ((this.mobY - famY) * fxT) - (((float) Math.sin(fxT * 3.141592653589793d)) * fxHu * 3.0f);
+                    float fxFd = 1.0f - (fxK / 7.0f);
+                    this.fxP.setColor(-10829313);
+                    this.fxP.setAlpha((int) (90.0f * fxFd));
+                    canvas.drawCircle(fxBx, fxBy, fxHu * ((1.4f * fxFd) + 0.6f), this.fxP);
+                    this.fxP.setColor(-2033409);
+                    this.fxP.setAlpha((int) (200.0f * fxFd));
+                    float fxQ = fxHu * 0.45f * fxFd;
+                    canvas.drawRect(fxBx - fxQ, fxBy - fxQ, fxBx + fxQ, fxBy + fxQ, this.fxP);
+                }
+            }
             float f4 = famX + ((this.mobX - famX) * f3);
-            float f5 = famY + ((this.mobY - famY) * f3);
-            this.p.setColor(1717228031);
-            canvas.drawCircle(f4, f5, this.hu * 2.2f, this.p);
-            this.p.setColor(-2033409);
-            float f6 = this.hu;
-            canvas.drawRect(f4 - f6, f5 - f6, f4 + f6, f5 + f6, this.p);
+            float f5 = famY + ((this.mobY - famY) * f3) - (((float) Math.sin(f3 * 3.141592653589793d)) * fxHu * 3.0f);
+            float fxPl = (float) ((Math.sin((this.time * 22.0f) + next.max) * 0.5d) + 0.5d);
+            this.fxP.setColor(1717228031);
+            canvas.drawCircle(f4, f5, fxHu * ((0.6f * fxPl) + 3.0f), this.fxP);
+            this.fxP.setColor(-5517825);
+            this.fxP.setAlpha(150);
+            canvas.drawCircle(f4, f5, fxHu * 1.8f, this.fxP);
+            // spinning crystal core
+            canvas.save();
+            canvas.rotate(this.time * 540.0f, f4, f5);
+            this.fxP.setColor(-2033409);
+            float f6 = fxHu * 1.15f;
+            canvas.drawRect(f4 - f6, f5 - f6, f4 + f6, f5 + f6, this.fxP);
+            this.fxP.setColor(-1);
+            float fxC = fxHu * 0.5f;
+            canvas.drawRect(f4 - fxC, f5 - fxC, f4 + fxC, f5 + fxC, this.fxP);
+            canvas.restore();
+            // orbiting twinkles
+            for (int fxO = OV_NONE; fxO < 3; fxO++) {
+                double fxAn = (this.time * 9.0f) + (fxO * 2.0943951023931953d);
+                float fxOx = f4 + (((float) Math.cos(fxAn)) * fxHu * 2.6f);
+                float fxOy = f5 + (((float) Math.sin(fxAn)) * fxHu * 2.6f);
+                this.fxP.setColor(-2033409);
+                this.fxP.setAlpha(210);
+                float fxOs = fxHu * 0.35f;
+                canvas.drawRect(fxOx - fxOs, fxOy - fxOs, fxOx + fxOs, fxOy + fxOs, this.fxP);
+            }
+            // arrival flash at the monster
+            if (f3 > 0.8f) {
+                float fxIm = (f3 - 0.8f) / 0.2f;
+                this.fxS.setColor(-5517825);
+                this.fxS.setAlpha((int) (220.0f * (1.0f - (fxIm * 0.6f))));
+                this.fxS.setStrokeWidth((fxHu * 0.8f) + 1.0f);
+                canvas.drawCircle(this.mobX, this.mobY, fxHu * ((5.0f * fxIm) + 1.5f), this.fxS);
+                this.fxP.setColor(-1);
+                this.fxP.setAlpha((int) (150.0f * fxIm));
+                canvas.drawCircle(this.mobX, this.mobY, fxHu * 2.2f * fxIm, this.fxP);
+            }
         }
         Iterator<Fx> it2 = this.bolts.iterator();
         while (it2.hasNext()) {
             Fx next2 = it2.next();
+            if (next2.max <= 0.0f) {
+                continue;
+            }
             float f7 = next2.life / next2.max;
             float f8 = this.heroX;
             float f9 = this.hu;
             float f10 = f8 + (13.0f * f9);
             float f11 = this.groundY - (f9 * 26.0f);
-            int i5 = 3;
-            while (i5 >= i3) {
-                float f12 = i5;
-                float f13 = f7 - (0.09f * f12);
-                if (f13 <= f) {
-                    i2 = i5;
-                } else {
+            // tapered fire trail: soft orange halo + hot yellow core beads
+            for (int fxK2 = 7; fxK2 >= 1; fxK2--) {
+                float f13 = f7 - (0.045f * fxK2);
+                if (f13 > 0.0f) {
                     float f14 = ((this.mobX - f10) * f13) + f10;
                     float sin = (f11 + ((this.mobY - f11) * f13)) - ((((float) Math.sin(f13 * 3.141592653589793d)) * this.mobR) * 0.6f);
-                    float f15 = this.hu * (1.5f - (f12 * 0.35f));
-                    this.p.setColor(i5 == 1 ? -11430 : i5 == 2 ? -26051 : -2076614);
-                    this.p.setAlpha(220 - (i5 * 50));
-                    i2 = i5;
-                    canvas.drawRect(f14 - f15, sin - f15, f14 + f15, sin + f15, this.p);
+                    float fxFd2 = 1.0f - (fxK2 / 8.0f);
+                    this.fxP.setColor(-34243);
+                    this.fxP.setAlpha((int) (95.0f * fxFd2));
+                    canvas.drawCircle(f14, sin, f9 * ((2.6f * fxFd2) + 0.8f), this.fxP);
+                    this.fxP.setColor(-5720);
+                    this.fxP.setAlpha((int) (190.0f * fxFd2));
+                    canvas.drawCircle(f14, sin, f9 * ((1.3f * fxFd2) + 0.3f), this.fxP);
+                    if (fxK2 <= 3) {
+                        // flickering pixel embers drifting off the trail
+                        float fxEj = ((float) Math.sin((this.time * 47.0f) + (fxK2 * 1.7f))) * f9 * 1.6f;
+                        float f15 = f9 * (1.1f - (fxK2 * 0.22f));
+                        this.fxP.setColor(fxK2 == 1 ? -11430 : fxK2 == 2 ? -26051 : -2076614);
+                        this.fxP.setAlpha(230 - (fxK2 * 40));
+                        canvas.drawRect(f14 - f15, (sin + fxEj) - f15, f14 + f15, sin + fxEj + f15, this.fxP);
+                    }
                 }
-                i5 = i2 - 1;
-                f = 0.0f;
-                i3 = 1;
             }
-            this.p.setAlpha(255);
-            f = 0.0f;
-            i3 = 1;
         }
         Iterator<Fx> it3 = this.bolts.iterator();
         while (it3.hasNext()) {
             Fx next3 = it3.next();
+            if (next3.max <= 0.0f) {
+                continue;
+            }
             float f16 = next3.life / next3.max;
             float f17 = this.heroX;
             float f18 = this.hu;
@@ -2746,12 +3163,29 @@ public class GameView extends View implements Runnable {
             float f20 = this.groundY - (f18 * 26.0f);
             float f21 = f19 + ((this.mobX - f19) * f16);
             float sin2 = (f20 + ((this.mobY - f20) * f16)) - ((((float) Math.sin(f16 * 3.141592653589793d)) * this.mobR) * 0.6f);
-            this.p.setColor(1157593661);
-            canvas.drawCircle(f21, sin2, this.hu * 3.5f, this.p);
+            float fxFl = (float) ((Math.sin(this.time * 31.0f) * 0.5d) + 0.5d);
+            // layered additive-looking glow around the fireball
+            this.fxP.setColor(1157593661);
+            canvas.drawCircle(f21, sin2, f18 * ((0.8f * fxFl) + 5.6f), this.fxP);
+            this.fxP.setColor(-26051);
+            this.fxP.setAlpha(90);
+            canvas.drawCircle(f21, sin2, f18 * 3.6f, this.fxP);
+            this.fxP.setColor(-5720);
+            this.fxP.setAlpha(150);
+            canvas.drawCircle(f21, sin2, f18 * ((0.4f * fxFl) + 2.0f), this.fxP);
             Bitmap bitmap2 = this.bmFire;
-            float height = bitmap2.getHeight();
-            float f22 = this.hu;
-            blit(canvas, bitmap2, f21, sin2 + (height * f22 * 0.42f), f22 * 0.85f, 1.0f, 1.0f, this.bp);
+            if (bitmap2 != null) {
+                float height = bitmap2.getHeight();
+                float f22 = this.hu;
+                blit(canvas, bitmap2, f21, sin2 + (height * f22 * 0.42f), f22 * 0.85f, 1.0f, 1.0f, this.bp);
+            }
+            // pre-impact flare on the monster
+            if (f16 > 0.7f) {
+                float fxIm2 = (f16 - 0.7f) / 0.3f;
+                this.fxP.setColor(-11430);
+                this.fxP.setAlpha((int) (120.0f * fxIm2));
+                canvas.drawCircle(this.mobX, this.mobY, f18 * ((3.0f * fxIm2) + 2.0f), this.fxP);
+            }
         }
         if (this.fairyOn) {
             drawFairy(canvas);
@@ -2798,12 +3232,33 @@ public class GameView extends View implements Runnable {
         Iterator<Fx> it5 = this.chunks.iterator();
         while (it5.hasNext()) {
             Fx next5 = it5.next();
+            if (next5.max <= 0.0f) {
+                continue;
+            }
             float f27 = next5.life / next5.max;
-            this.p.setColor(next5.color);
-            this.p.setAlpha((int) ((f27 < 0.65f ? 1.0f : Math.max(0.0f, (1.0f - f27) / 0.35f)) * 255.0f));
+            float fxCa = f27 < 0.65f ? 1.0f : Math.max(0.0f, (1.0f - f27) / 0.35f);
             float f28 = next5.size * 0.5f;
-            canvas.drawRect(next5.x - f28, next5.y - f28, next5.x + f28, next5.y + f28, this.p);
+            // contact shadow grows as the chunk nears the ground
+            float fxHg = this.groundY - next5.y;
+            float fxSr = next5.size * 5.0f;
+            if (fxHg < fxSr && fxHg > -next5.size) {
+                float fxNs = 1.0f - Math.max(0.0f, fxHg / fxSr);
+                this.fxP.setColor(-16777216);
+                this.fxP.setAlpha((int) (90.0f * fxCa * fxNs));
+                float fxSw = f28 * ((0.6f * fxNs) + 0.7f);
+                canvas.drawRect(next5.x - fxSw, this.groundY - (f28 * 0.3f), next5.x + fxSw, this.groundY + (f28 * 0.3f), this.fxP);
+            }
+            // white-hot at the moment of shattering, cooling into the sprite colour
+            int fxCc = next5.life < 0.14f ? fxMix(next5.color, -1, 1.0f - (next5.life / 0.14f)) : next5.color;
+            this.fxP.setColor(fxCc);
+            this.fxP.setAlpha((int) (fxCa * 255.0f));
+            canvas.drawRect(next5.x - f28, next5.y - f28, next5.x + f28, next5.y + f28, this.fxP);
+            // pixel bevel: darker lower edge for volume
+            this.fxP.setColor(fxShade(fxCc, 0.6f));
+            this.fxP.setAlpha((int) (fxCa * 255.0f));
+            canvas.drawRect(next5.x - f28, next5.y + (f28 * 0.4f), next5.x + f28, next5.y + f28, this.fxP);
         }
+        fxDrawSparks(canvas);
         this.p.setAlpha(255);
         drawGrass(canvas);
         drawVignette(canvas);
@@ -2863,17 +3318,73 @@ public class GameView extends View implements Runnable {
         this.tp.setFakeBoldText(false);
         this.tp.setTypeface(this.pixTf);
         Iterator<Fx> it6 = this.floats.iterator();
+        this.fxTxt.setTypeface(this.pixTf);
+        this.fxTxtO.setTypeface(this.pixTf);
+        this.fxTxt.setTextAlign(Paint.Align.CENTER);
+        this.fxTxtO.setTextAlign(Paint.Align.CENTER);
         while (it6.hasNext()) {
             Fx next6 = it6.next();
-            float f43 = next6.life / next6.max;
-            this.tp.setTextSize(next6.size * 0.62f * (f43 < 0.12f ? ((f43 / 0.12f) * 0.45f) + 0.7f : 1.15f - Math.min(0.15f, f43 - 0.12f)));
-            int min3 = (int) (Math.min(1.0f, (1.0f - f43) * 2.0f) * 255.0f);
-            this.tp.setColor(-15331286);
-            this.tp.setAlpha(min3);
-            canvas.drawText(next6.text, next6.x + (this.pad * 0.25f), next6.y + (this.pad * 0.25f), this.tp);
-            this.tp.setColor(next6.color);
-            this.tp.setAlpha(min3);
-            canvas.drawText(next6.text, next6.x, next6.y, this.tp);
+            if (next6.max <= 0.0f || next6.text == null) {
+                continue;
+            }
+            float f43 = fxClamp(next6.life / next6.max);
+            int fxCol = next6.color;
+            boolean fxCrit = fxCol == -42406 || fxCol == -26051;
+            boolean fxGold = fxCol == -11430 || fxCol == -16310 || fxCol == -10496;
+            boolean fxBig = fxCrit || next6.size > this.pad * 2.6f;
+            // pop-in with overshoot, then a gentle shrink as it fades
+            float fxPop = fxBack(f43 / (fxBig ? 0.2f : 0.15f));
+            float fxSc = ((0.65f * fxPop) + 0.4f) * (1.0f - (Math.max(0.0f, f43 - 0.65f) * 0.35f));
+            float fxTs = next6.size * (fxCrit ? 0.74f : 0.64f) * fxSc;
+            if (fxTs < 1.0f) {
+                continue;
+            }
+            // eased rise: fast launch, soft float at the top
+            float fxY0 = next6.y - (next6.vy * next6.life);
+            float fxY = fxY0 + (next6.vy * next6.max * fxOut(f43) * 1.15f);
+            float fxX = next6.x;
+            if (fxBig && f43 < 0.3f) {
+                fxX += ((float) Math.sin(next6.life * 70.0f)) * this.pad * 0.3f * (1.0f - (f43 / 0.3f));
+            }
+            int min3 = (int) (Math.min(1.0f, (1.0f - f43) * 2.4f) * Math.min(1.0f, f43 / 0.04f + 0.3f) * 255.0f);
+            // starburst flash behind crits
+            if (fxCrit && f43 < 0.35f) {
+                float fxFb = 1.0f - (f43 / 0.35f);
+                float fxRc = fxY - (fxTs * 0.35f);
+                this.fxS.setColor(-5720);
+                this.fxS.setAlpha((int) (170.0f * fxFb));
+                this.fxS.setStrokeWidth((this.hu * 0.9f) + 1.0f);
+                for (int fxR8 = OV_NONE; fxR8 < 8; fxR8++) {
+                    double fxAn = (fxR8 * 0.7853981633974483d) + (next6.life * 3.0f);
+                    float fxL0 = fxTs * 0.5f;
+                    float fxL1 = fxTs * ((1.4f * fxPop) + (fxR8 % 2 == 0 ? 0.6f : 0.1f));
+                    float fxCo = (float) Math.cos(fxAn);
+                    float fxSi = (float) Math.sin(fxAn);
+                    canvas.drawLine(fxX + (fxCo * fxL0), fxRc + (fxSi * fxL0 * 0.6f), fxX + (fxCo * fxL1), fxRc + (fxSi * fxL1 * 0.6f), this.fxS);
+                }
+            }
+            boolean fxTilt = fxBig && f43 < 0.4f;
+            if (fxTilt) {
+                canvas.save();
+                canvas.rotate((((int) (next6.max * 1000.0f + next6.x)) % 2 == 0 ? -7.0f : 7.0f) * (1.0f - (f43 / 0.4f)), fxX, fxY);
+            }
+            this.fxTxt.setTextSize(fxTs);
+            this.fxTxtO.setTextSize(fxTs);
+            // drop shadow
+            this.fxTxt.setColor(-15331286);
+            this.fxTxt.setAlpha((min3 * 3) / 5);
+            float fxSh = Math.max(1.0f, fxTs * 0.08f);
+            canvas.drawText(next6.text, fxX + fxSh, fxY + (fxSh * 1.3f), this.fxTxt);
+            // dark outline + fill (banded gradient for crits / gold)
+            this.fxTxtO.setColor(-15331286);
+            this.fxTxtO.setAlpha(min3);
+            this.fxTxtO.setStrokeWidth(Math.max(1.5f, fxTs * 0.16f));
+            this.fxTxt.setColor(fxCol);
+            this.fxTxt.setAlpha(min3);
+            fxFloatText(canvas, next6.text, fxX, fxY, fxCrit ? 1 : (fxGold ? 2 : 0));
+            if (fxTilt) {
+                canvas.restore();
+            }
         }
         this.tp.setTypeface(Typeface.DEFAULT);
         this.tp.setAlpha(255);
@@ -3605,11 +4116,70 @@ public class GameView extends View implements Runnable {
     }
 
     void drawCoins(Canvas canvas) {
+        if (this.bmCoin == null || this.coins.isEmpty()) {
+            return;
+        }
         float f = this.hu * 0.42f;
+        float fxCw = this.bmCoin.getWidth() * f;
+        float fxCh = this.bmCoin.getHeight() * f;
+        float fxTx = this.pad * 3.0f;
+        float fxTy = this.headerB * 0.55f;
         Iterator<Fx> it = this.coins.iterator();
         while (it.hasNext()) {
             Fx next = it.next();
-            blit(canvas, this.bmCoin, next.x, ((this.bmCoin.getHeight() * f) / 2.0f) + next.y, f, Math.max(0.25f, (float) Math.abs(Math.cos((next.life * 9.0f) + next.size))), 1.0f, this.bp);
+            float fxCos = (float) Math.cos((next.life * 9.0f) + next.size);
+            float fxSx = Math.max(0.12f, Math.abs(fxCos));
+            float fxHome = next.life > next.max ? Math.min(1.0f, (next.life - next.max) * 3.2f) : 0.0f;
+            // motion streak while flying to the gold counter
+            if (fxHome > 0.0f) {
+                float fxDx = fxTx - next.x;
+                float fxDy = fxTy - next.y;
+                float fxLen = (float) Math.hypot(fxDx, fxDy);
+                if (fxLen > 1.0f) {
+                    float fxTl = this.pad * 3.2f * fxHome;
+                    float fxEx = next.x - ((fxDx / fxLen) * fxTl);
+                    float fxEy = next.y - ((fxDy / fxLen) * fxTl);
+                    this.fxS.setColor(-11430);
+                    this.fxS.setAlpha((int) (70.0f * fxHome));
+                    this.fxS.setStrokeWidth(fxCh * 0.8f);
+                    canvas.drawLine(fxEx, fxEy, next.x, next.y, this.fxS);
+                    this.fxS.setColor(-4952);
+                    this.fxS.setAlpha((int) (170.0f * fxHome));
+                    this.fxS.setStrokeWidth(fxCh * 0.25f);
+                    canvas.drawLine(fxEx, fxEy, next.x, next.y, this.fxS);
+                }
+            }
+            // warm glow halo
+            this.fxP.setColor(-11430);
+            this.fxP.setAlpha((int) ((40.0f * fxHome) + 45.0f));
+            canvas.drawCircle(next.x, next.y, Math.max(fxCw, fxCh) * 0.85f, this.fxP);
+            // spin: back face rendered darker
+            Paint fxCp = this.bp;
+            if (fxCos < 0.0f) {
+                this.fxBmp.setColorFilter(this.fxCoinBack);
+                fxCp = this.fxBmp;
+            }
+            blit(canvas, this.bmCoin, next.x, (fxCh / 2.0f) + next.y, f, fxSx, 1.0f, fxCp);
+            // edge-on glint
+            if (fxSx < 0.35f) {
+                this.fxP.setColor(-2338);
+                this.fxP.setAlpha((int) ((1.0f - (fxSx / 0.35f)) * 230.0f));
+                float fxGw = Math.max(1.0f, this.hu * 0.25f);
+                canvas.drawRect(next.x - fxGw, next.y - (fxCh * 0.5f), next.x + fxGw, next.y + (fxCh * 0.5f), this.fxP);
+            }
+            // twinkling 4-point sparkle
+            float fxTw = (float) Math.sin((next.life * 11.0f) + (next.size * 3.0f));
+            if (fxTw > 0.3f) {
+                float fxK = (fxTw - 0.3f) / 0.7f;
+                float fxSxp = next.x + (fxCw * 0.35f);
+                float fxSyp = next.y - (fxCh * 0.35f);
+                float fxSl = this.pad * 0.9f * fxK;
+                this.fxS.setColor(-1);
+                this.fxS.setAlpha((int) (230.0f * fxK));
+                this.fxS.setStrokeWidth(Math.max(1.0f, this.hu * 0.3f));
+                canvas.drawLine(fxSxp - fxSl, fxSyp, fxSxp + fxSl, fxSyp, this.fxS);
+                canvas.drawLine(fxSxp, fxSyp - fxSl, fxSxp, fxSyp + fxSl, this.fxS);
+            }
         }
     }
 
@@ -8512,7 +9082,10 @@ public class GameView extends View implements Runnable {
         canvas.drawColor(-15594462);
         canvas.save();
         if (this.shake > 0.0f) {
-            canvas.translate((this.rnd.nextFloat() - 0.5f) * this.shake * this.pad * 2.0f, (this.rnd.nextFloat() - 0.5f) * this.shake * this.pad * 2.0f);
+            // decaying multi-frequency sine shake: punchy start, smooth settle
+            float fxAmp = ((this.shake * this.shake * 0.8f) + (this.shake * 0.35f)) * this.pad;
+            float fxSt = this.time;
+            canvas.translate(fxAmp * ((((float) Math.sin(fxSt * 53.0f)) * 0.75f) + (((float) Math.sin((fxSt * 97.0f) + 1.3f)) * 0.35f)), fxAmp * ((((float) Math.cos(fxSt * 47.0f)) * 0.7f) + (((float) Math.sin((fxSt * 83.0f) + 0.7f)) * 0.3f)));
         }
         drawBattle(canvas, uptimeMillis2);
         canvas.restore();
@@ -8532,28 +9105,7 @@ public class GameView extends View implements Runnable {
         }
         float f = this.bannerT;
         if (f > 0.0f && this.banner != null) {
-            float min = Math.min(1.0f, f);
-            this.p.setColor(-534768320);
-            this.p.setAlpha((int) (224.0f * min));
-            RectF rectF = this.r;
-            float f2 = this.pad;
-            float f3 = this.battleT;
-            rectF.set(f2 * 2.0f, f3 + f2, this.W - (f2 * 2.0f), f3 + (f2 * 5.5f));
-            RectF rectF2 = this.r;
-            float f4 = this.pad;
-            canvas.drawRoundRect(rectF2, f4, f4, this.p);
-            this.tp.setColor(this.bannerColor);
-            this.tp.setAlpha((int) (min * 255.0f));
-            this.tp.setTextSize(this.pad * 2.0f);
-            this.tp.setTextAlign(Paint.Align.CENTER);
-            this.tp.setFakeBoldText(true);
-            String str = this.banner;
-            int i3 = this.W;
-            float f5 = this.battleT;
-            float f6 = this.pad;
-            drawFit(canvas, str, i3 / 2.0f, f5 + (4.0f * f6), i3 - (f6 * 6.0f));
-            this.tp.setAlpha(255);
-            this.tp.setFakeBoldText(false);
+            fxDrawBanner(canvas, f);
         }
         if (this.overlay != 0) {
             drawOverlay(canvas);
