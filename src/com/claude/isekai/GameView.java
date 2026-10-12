@@ -5431,6 +5431,7 @@ public class GameView extends View implements Runnable {
             f = 1.0f;
             blit(canvas, this.bmTruck, f7, this.groundY + (f10 * 1.5f) + sin, f10, 1.0f, 1.0f, this.bp);
             if (f3 > 0.2f && f3 < IMPACT) {
+                ovlGlow(canvas, f7 - f5, this.groundY - (f10 * 9.0f), f10 * 14.0f, -5720, (int) ((Math.sin(f3 * 50.0f) * 25.0d) + 150.0d));
                 this.p.setColor(1442837160);
                 canvas.drawCircle(f7 - f5, this.groundY - (f10 * 9.0f), f10 * 5.0f, this.p);
             }
@@ -5477,6 +5478,26 @@ public class GameView extends View implements Runnable {
                 canvas.drawRect(0.0f, this.battleT, this.W, this.battleB, this.p);
                 this.p.setAlpha(255);
             }
+            if (f20 >= 0.0f && f20 < 0.9f) {
+                float ovlQ = f20 / 0.9f;
+                float ovlQe = 1.0f - ((1.0f - ovlQ) * (1.0f - ovlQ));
+                float ovlIx = this.heroX;
+                float ovlIy = this.groundY - (this.hu * 12.0f);
+                float ovlU = this.hu;
+                ovlShock(canvas, ovlIx, ovlIy, ovlU * ((ovlQe * 46.0f) + 6.0f), ((1.0f - ovlQ) * ovlU * 2.4f) + 1.0f, -11430, (int) ((1.0f - ovlQ) * 230.0f));
+                ovlBurst(canvas, ovlIx, ovlIy, ovlU * ((ovlQe * 22.0f) + 8.0f), ovlU * ((ovlQe * 50.0f) + 14.0f), 16, 5.0f, -1, (int) ((1.0f - ovlQ) * 220.0f), ((1.0f - ovlQ) * ovlU * 1.4f) + 1.0f);
+                this.ovlP.setStyle(Paint.Style.FILL);
+                for (int ovlK = 0; ovlK < 10; ovlK++) {
+                    float ovlDir = ovlK < 5 ? -1.0f : 1.0f;
+                    float ovlSp = (ovlHash(ovlK, 81) * 0.7f) + 0.5f;
+                    float ovlDx = ovlDir * ovlQe * ovlSp * ovlU * 34.0f;
+                    float ovlDy = ((float) Math.sin(ovlQ * 3.141592653589793d)) * ovlU * ((ovlHash(ovlK, 82) * 10.0f) + 4.0f);
+                    float ovlS1 = ovlU * ((ovlHash(ovlK, 83) * 2.5f) + 2.0f) * ((ovlQ * 0.8f) + 0.6f);
+                    this.ovlP.setColor(ovlK % 2 == 0 ? -4609816 : -7569238);
+                    this.ovlP.setAlpha((int) ((1.0f - ovlQ) * 170.0f));
+                    canvas.drawRect((ovlIx + ovlDx) - ovlS1, (this.groundY - ovlDy) - ovlS1, ovlIx + ovlDx + ovlS1, this.groundY - ovlDy, this.ovlP);
+                }
+            }
             if (f20 < 1.4f) {
                 float min2 = f20 < 0.15f ? (f20 / 0.15f) * 1.3f : 1.3f - Math.min(0.3f, f20 - 0.15f);
                 canvas.save();
@@ -5494,9 +5515,12 @@ public class GameView extends View implements Runnable {
                 float f24 = this.battleT;
                 canvas.drawText(strArr[this.deathKind], (this.W / 2.0f) + (f23 * 0.5f), f24 + ((this.battleB - f24) * 0.4f) + (f23 * 0.5f), this.tp);
                 this.tp.setColor(-11430);
-                this.tp.setAlpha((int) (Math.min(f, f22) * 255.0f));
+                int ovlBa = (int) (Math.min(f, f22) * 255.0f);
+                this.tp.setAlpha(ovlBa);
                 float f25 = this.battleT;
+                this.tp.setShadowLayer(this.pad * 1.2f, 0.0f, 0.0f, (((ovlBa * 230) / 255) << 24) | 16737843);
                 canvas.drawText(strArr[this.deathKind], this.W / 2.0f, f25 + ((this.battleB - f25) * 0.4f), this.tp);
+                this.tp.clearShadowLayer();
                 this.tp.setAlpha(255);
                 this.tp.setFakeBoldText(false);
                 this.tp.setTypeface(Typeface.DEFAULT);
@@ -6932,6 +6956,21 @@ public class GameView extends View implements Runnable {
           float var5 = (float)this.W * 0.86F;
           float var4 = this.battleT;
           var4 += (this.groundY - var4) * 0.14F;
+          float ovlPo = Math.min(1.0F, var2 * 3.0F) * Math.min(1.0F, Math.max(0.0F, (1.25F - var2) * 3.0F));
+          this.ovlGlow(var1, var5, var4, this.pad * 10.0F * (0.4F + 0.6F * ovlPo), -8395009, (int)(150.0F * ovlPo));
+          this.ovlRays(var1, var5, var4, this.pad * 9.0F * ovlPo, 12, this.time * -160.0F, 0.08F, -5213953, (int)(60.0F * ovlPo));
+          this.ovlP.setStyle(Style.FILL);
+          this.ovlP.setColor(-15069648);
+          this.ovlP.setAlpha((int)(200.0F * ovlPo));
+          this.ovlR.set(var5 - this.pad * 2.6F * ovlPo, var4 - this.pad * 1.95F * ovlPo, var5 + this.pad * 2.6F * ovlPo, var4 + this.pad * 1.95F * ovlPo);
+          var1.drawOval(this.ovlR, this.ovlP);
+          for (int ovlK = 0; ovlK < 12; ovlK++) {
+             float ovlPh = (this.time * 0.9F + ovlHash(ovlK, 91)) % 1.0F;
+             double ovlAng = (double)ovlK * 0.5235987755982988 + (double)(ovlPh * 5.0F) + (double)this.time;
+             float ovlRad = this.pad * 7.0F * (1.0F - ovlPh) * ovlPo;
+             this.ovlSpark(var1, var5 + (float)Math.cos(ovlAng) * ovlRad, var4 + (float)Math.sin(ovlAng) * ovlRad * 0.75F, this.pad * 0.5F * (0.4F + ovlPh), ovlK % 2 == 0 ? -5213953 : -8395009, (int)(230.0F * ovlPo * ovlPh));
+          }
+
           this.p.setStyle(Style.STROKE);
           this.p.setStrokeWidth(this.pad * 0.5F);
 
@@ -6997,6 +7036,7 @@ public class GameView extends View implements Runnable {
              var1, this.bmTruck, var15, this.groundY + 1.5F * var23 + (float)Math.sin((double)(this.isekaiT * 40.0F)) * var23 * 0.3F, var23, 1.0F, 1.0F, this.bp
           );
           var1.restore();
+          this.ovlGlow(var1, var15 + var20 / 2.0F, this.groundY - 9.0F * var23, var23 * 14.0F, -5720, (int)(Math.sin((double)(this.isekaiT * 50.0F)) * 25.0 + 150.0));
           this.p.setColor(1442837160);
           var1.drawCircle(var15 + var20 / 2.0F, this.groundY - 9.0F * var23, var23 * 5.0F, this.p);
        }
@@ -8167,6 +8207,485 @@ public class GameView extends View implements Runnable {
         }
     }
 
+    // ===== ovl: overlay & dialog rendering helpers (visual only) =====
+    static final float[] ovlGlowPos = {0.0f, 0.3f, 1.0f};
+    static final String[] ovlStarStr = {"☆☆☆", "★☆☆", "★★☆", "★★★"};
+    static final String[] ovlHolyGlyph = {"✦", "◆", "✧", "❖", "✦", "◇", "✧", "❖"};
+    final Paint ovlP = new Paint(1);
+    final Paint ovlS = new Paint(1);
+    final Paint ovlGlowP = new Paint(1);
+    final Paint ovlBackP = new Paint();
+    final Path ovlPath = new Path();
+    final Path ovlPath2 = new Path();
+    final PathMeasure ovlPM = new PathMeasure();
+    final float[] ovlTip = new float[2];
+    final RectF ovlR = new RectF();
+    final RectF ovlR2 = new RectF();
+    final RadialGradient[] ovlGlowSh = new RadialGradient[12];
+    final int[] ovlGlowKey = new int[12];
+    int ovlGlowNext;
+    Shader ovlBackSh;
+    Shader ovlVigSh;
+    int ovlBackKey = -1;
+    Shader ovlDeathSh;
+    int ovlDeathKey = -1;
+    final float[] ovlSw = new float[4];
+    float ovlSwT = -1.0f;
+
+    static float ovlHash(int k, int salt) {
+        int h = (k * 374761393) + (salt * 668265263);
+        h = (h ^ (h >>> 13)) * 1274126177;
+        return ((h ^ (h >>> 16)) & 65535) / 65535.0f;
+    }
+
+    static int ovlMix(int a, int b, float t) {
+        if (t <= 0.0f) {
+            return a;
+        }
+        if (t >= 1.0f) {
+            return b;
+        }
+        return Color.argb((int) (Color.alpha(a) + ((Color.alpha(b) - Color.alpha(a)) * t)), (int) (Color.red(a) + ((Color.red(b) - Color.red(a)) * t)), (int) (Color.green(a) + ((Color.green(b) - Color.green(a)) * t)), (int) (Color.blue(a) + ((Color.blue(b) - Color.blue(a)) * t)));
+    }
+
+    static int ovlClampA(float a) {
+        return a <= 0.0f ? 0 : a >= 255.0f ? 255 : (int) a;
+    }
+
+    /** 0..1 progress since the current overlay opened. */
+    float ovlOpenT(float ms) {
+        long d = SystemClock.uptimeMillis() - this.overlayAt;
+        if (d < 0 || ms <= 0.0f) {
+            return 1.0f;
+        }
+        return Math.min(1.0f, d / ms);
+    }
+
+    static float ovlEaseBack(float t) {
+        float u = t - 1.0f;
+        return (2.70158f * u * u * u) + 1.0f + (1.70158f * u * u);
+    }
+
+    /** Soft radial glow; one cached unit gradient per colour. */
+    void ovlGlow(Canvas c, float x, float y, float rad, int color, int alpha) {
+        if (rad < 1.0f || alpha <= 0) {
+            return;
+        }
+        int rgb = color | (-16777216);
+        RadialGradient sh = null;
+        for (int k = 0; k < 12; k++) {
+            if (this.ovlGlowSh[k] != null && this.ovlGlowKey[k] == rgb) {
+                sh = this.ovlGlowSh[k];
+                break;
+            }
+        }
+        if (sh == null) {
+            int k2 = this.ovlGlowNext;
+            this.ovlGlowNext = (k2 + 1) % 12;
+            int base = rgb & 16777215;
+            sh = new RadialGradient(0.0f, 0.0f, 1.0f, new int[]{rgb, 1711276032 | base, base}, ovlGlowPos, Shader.TileMode.CLAMP);
+            this.ovlGlowSh[k2] = sh;
+            this.ovlGlowKey[k2] = rgb;
+        }
+        this.ovlGlowP.setShader(sh);
+        this.ovlGlowP.setAlpha(Math.min(255, alpha));
+        c.save();
+        c.translate(x, y);
+        c.scale(rad, rad);
+        c.drawRect(-1.0f, -1.0f, 1.0f, 1.0f, this.ovlGlowP);
+        c.restore();
+    }
+
+    /** Rotating light rays (one path, one draw). */
+    void ovlRays(Canvas c, float x, float y, float len, int n, float rotDeg, float halfW, int color, int alpha) {
+        if (len < 1.0f || alpha <= 0 || n <= 0) {
+            return;
+        }
+        this.ovlPath.reset();
+        double rot = Math.toRadians(rotDeg);
+        for (int k = 0; k < n; k++) {
+            double a = rot + ((k * 6.283185307179586d) / n);
+            float l2 = len * ((k % 2 == 0) ? 1.0f : 0.72f);
+            this.ovlPath.moveTo(x, y);
+            this.ovlPath.lineTo(x + (((float) Math.cos(a - halfW)) * l2), y + (((float) Math.sin(a - halfW)) * l2));
+            this.ovlPath.lineTo(x + (((float) Math.cos(a + halfW)) * l2), y + (((float) Math.sin(a + halfW)) * l2));
+            this.ovlPath.close();
+        }
+        this.ovlP.setStyle(Paint.Style.FILL);
+        this.ovlP.setColor(color);
+        this.ovlP.setAlpha(Math.min(255, alpha));
+        c.drawPath(this.ovlPath, this.ovlP);
+    }
+
+    /** Pixel 4-point sparkle. */
+    void ovlSpark(Canvas c, float x, float y, float s, int color, int alpha) {
+        if (alpha <= 0 || s <= 0.0f) {
+            return;
+        }
+        float w = Math.max(1.0f, s * 0.2f);
+        this.ovlP.setStyle(Paint.Style.FILL);
+        this.ovlP.setColor(color);
+        this.ovlP.setAlpha(Math.min(255, alpha));
+        c.drawRect(x - s, y - w, x + s, y + w, this.ovlP);
+        c.drawRect(x - w, y - s, x + w, y + s, this.ovlP);
+        this.ovlP.setColor(-1);
+        this.ovlP.setAlpha(Math.min(255, alpha));
+        float w2 = w * 1.4f;
+        c.drawRect(x - w2, y - w2, x + w2, y + w2, this.ovlP);
+    }
+
+    void ovlGem(Canvas c, float x, float y, float s, int color, int alpha) {
+        this.ovlP.setStyle(Paint.Style.FILL);
+        float o = s * 1.45f;
+        this.ovlPath.reset();
+        this.ovlPath.moveTo(x, y - o);
+        this.ovlPath.lineTo(x + o, y);
+        this.ovlPath.lineTo(x, y + o);
+        this.ovlPath.lineTo(x - o, y);
+        this.ovlPath.close();
+        this.ovlP.setColor(-15724524);
+        this.ovlP.setAlpha(alpha);
+        c.drawPath(this.ovlPath, this.ovlP);
+        this.ovlPath.reset();
+        this.ovlPath.moveTo(x, y - s);
+        this.ovlPath.lineTo(x + s, y);
+        this.ovlPath.lineTo(x, y + s);
+        this.ovlPath.lineTo(x - s, y);
+        this.ovlPath.close();
+        this.ovlP.setColor(color);
+        this.ovlP.setAlpha(alpha);
+        c.drawPath(this.ovlPath, this.ovlP);
+        this.ovlP.setColor(-1);
+        this.ovlP.setAlpha((alpha * 200) / 255);
+        float h = s * 0.32f;
+        c.drawRect((x - (s * 0.42f)) - h, (y - (s * 0.42f)) - h, (x - (s * 0.42f)) + h, (y - (s * 0.42f)) + h, this.ovlP);
+    }
+
+    /** Ornate dialog panel: drop shadow, two-tone fill, double border, corner gems, travelling glint. */
+    void ovlFrame(Canvas c, float l, float t, float r, float b, int accent, float a) {
+        if (r - l < 8.0f || b - t < 8.0f) {
+            return;
+        }
+        int A = ovlClampA(a * 255.0f);
+        if (A == 0) {
+            return;
+        }
+        float rad = this.pad * 1.6f;
+        float px = Math.max(1.0f, this.pad * 0.22f);
+        this.ovlP.setStyle(Paint.Style.FILL);
+        this.ovlR.set(l, t + (px * 2.5f), r, b + (px * 2.5f));
+        this.ovlP.setColor(-16777216);
+        this.ovlP.setAlpha((A * 120) / 255);
+        c.drawRoundRect(this.ovlR, rad, rad, this.ovlP);
+        this.ovlR.set(l, t, r, b);
+        this.ovlP.setColor(-15069648);
+        this.ovlP.setAlpha((A * 215) / 255);
+        c.drawRoundRect(this.ovlR, rad, rad, this.ovlP);
+        this.ovlR2.set(l + px, t + px, r - px, t + Math.min((b - t) * 0.42f, this.pad * 14.0f));
+        this.ovlP.setColor(accent);
+        this.ovlP.setAlpha((A * 16) / 255);
+        c.drawRoundRect(this.ovlR2, rad, rad, this.ovlP);
+        this.ovlR2.set(l + px, b - (this.pad * 2.5f), r - px, b - px);
+        this.ovlP.setColor(-16777216);
+        this.ovlP.setAlpha((A * 50) / 255);
+        c.drawRoundRect(this.ovlR2, rad, rad, this.ovlP);
+        this.ovlS.setStyle(Paint.Style.STROKE);
+        this.ovlS.setStrokeWidth(px * 1.6f);
+        this.ovlS.setColor(ovlMix(accent, -16777216, 0.45f));
+        this.ovlS.setAlpha(A);
+        c.drawRoundRect(this.ovlR, rad, rad, this.ovlS);
+        this.ovlS.setStrokeWidth(px * 0.8f);
+        this.ovlS.setColor(accent);
+        this.ovlS.setAlpha((A * 230) / 255);
+        c.drawRoundRect(this.ovlR, rad, rad, this.ovlS);
+        float in = px * 3.4f;
+        this.ovlR2.set(l + in, t + in, r - in, b - in);
+        this.ovlS.setStrokeWidth(px * 0.6f);
+        this.ovlS.setAlpha((A * 90) / 255);
+        c.drawRoundRect(this.ovlR2, rad * 0.6f, rad * 0.6f, this.ovlS);
+        float span = (r - l) - (rad * 2.0f);
+        if (span > 0.0f) {
+            float ph = (this.time * 0.22f) % 1.0f;
+            float gx = l + rad + (span * ph);
+            float fade = (float) Math.sin(ph * 3.141592653589793d);
+            ovlGlow(c, gx, t, this.pad * 2.2f, -1, (int) (A * 0.55f * fade));
+            ovlGlow(c, r - (rad + (span * ph)), b, this.pad * 1.8f, accent, (int) (A * 0.45f * fade));
+        }
+        float cr = rad * 0.3f;
+        float gs = this.pad * 0.55f;
+        ovlGem(c, l + cr, t + cr, gs, accent, A);
+        ovlGem(c, r - cr, t + cr, gs, accent, A);
+        ovlGem(c, l + cr, b - cr, gs, accent, A);
+        ovlGem(c, r - cr, b - cr, gs, accent, A);
+        float cx = (l + r) / 2.0f;
+        this.ovlP.setColor(accent);
+        this.ovlP.setAlpha((A * 200) / 255);
+        c.drawRect(cx - (this.pad * 3.2f), t - (px * 0.4f), cx + (this.pad * 3.2f), t + (px * 0.4f), this.ovlP);
+        ovlGem(c, cx, t, this.pad * 0.85f, accent, A);
+        ovlGlow(c, cx, t, this.pad * 2.4f, accent, (int) (A * (0.3f + (((float) Math.sin(this.time * 3.0f)) * 0.15f))));
+    }
+
+    /** Ornamental divider line with centre gem. */
+    void ovlDivider(Canvas c, float cx, float y, float halfW, int color, int alpha) {
+        if (halfW < 2.0f || alpha <= 0) {
+            return;
+        }
+        float h = Math.max(1.0f, this.pad * 0.12f);
+        this.ovlP.setStyle(Paint.Style.FILL);
+        this.ovlP.setColor(color);
+        for (int k = 0; k < 3; k++) {
+            float w0 = halfW * (1.0f - (k * 0.3f));
+            this.ovlP.setAlpha((alpha * (60 + (k * 60))) / 255);
+            c.drawRect(cx - w0, y - h, cx + w0, y + h, this.ovlP);
+        }
+        ovlGem(c, cx, y, this.pad * 0.5f, color, alpha);
+    }
+
+    /** Beveled glossy button drawn over an existing rect (rect untouched). */
+    void ovlButton(Canvas c, RectF rr, int col, boolean hot) {
+        float rad = this.pad * 1.5f;
+        float px = Math.max(1.0f, this.pad * 0.22f);
+        if (hot) {
+            ovlGlow(c, rr.centerX(), rr.centerY(), rr.width() * 0.62f, col, (int) ((Math.sin(this.time * 4.0f) * 35.0d) + 75.0d));
+        }
+        this.ovlP.setStyle(Paint.Style.FILL);
+        this.ovlR.set(rr.left, rr.top + (px * 2.2f), rr.right, rr.bottom + (px * 2.2f));
+        this.ovlP.setColor(-1946157056);
+        c.drawRoundRect(this.ovlR, rad, rad, this.ovlP);
+        this.ovlR.set(rr.left, rr.top + px, rr.right, rr.bottom + px);
+        this.ovlP.setColor(ovlMix(col, -16777216, 0.45f));
+        c.drawRoundRect(this.ovlR, rad, rad, this.ovlP);
+        this.ovlP.setColor(col);
+        c.drawRoundRect(rr, rad, rad, this.ovlP);
+        this.ovlR.set(rr.left + px, rr.top + px, rr.right - px, rr.top + (rr.height() * 0.5f));
+        this.ovlP.setColor(-1);
+        this.ovlP.setAlpha(34);
+        c.drawRoundRect(this.ovlR, rad * 0.8f, rad * 0.8f, this.ovlP);
+        this.ovlP.setAlpha(110);
+        c.drawRect(rr.left + rad, rr.top + (px * 0.6f), rr.right - rad, rr.top + (px * 1.3f), this.ovlP);
+        this.ovlS.setStyle(Paint.Style.STROKE);
+        this.ovlS.setStrokeWidth(px * 0.8f);
+        this.ovlS.setColor(ovlMix(col, -1, 0.35f));
+        this.ovlS.setAlpha(hot ? 230 : 150);
+        c.drawRoundRect(rr, rad, rad, this.ovlS);
+        if (hot) {
+            float ph = (this.time * 0.55f) % 1.7f;
+            if (ph < 1.0f) {
+                float h = rr.height();
+                float x0 = (rr.left - h) + ((rr.width() + (h * 2.0f)) * ph);
+                float sw = h * 0.45f;
+                c.save();
+                c.clipRect(rr);
+                this.ovlPath.reset();
+                this.ovlPath.moveTo(x0, rr.bottom);
+                this.ovlPath.lineTo((h * 0.6f) + x0, rr.top);
+                this.ovlPath.lineTo((h * 0.6f) + x0 + sw, rr.top);
+                this.ovlPath.lineTo(x0 + sw, rr.bottom);
+                this.ovlPath.close();
+                this.ovlP.setColor(-1);
+                this.ovlP.setAlpha(55);
+                c.drawPath(this.ovlPath, this.ovlP);
+                c.restore();
+            }
+        }
+    }
+
+    /** Title text with a dark drop shadow and a coloured glow (shadow layer on text only). */
+    void ovlTitle(Canvas c, String s, float x, float y, float maxW, int glow) {
+        int col = this.tp.getColor();
+        float off = this.pad * 0.3f;
+        this.tp.setColor(-15725032);
+        this.tp.setAlpha(Color.alpha(col));
+        if (maxW > 0.0f) {
+            drawFit(c, s, x + off, y + off, maxW);
+        } else {
+            c.drawText(s, x + off, y + off, this.tp);
+        }
+        this.tp.setColor(col);
+        this.tp.setShadowLayer(this.pad * 1.1f, 0.0f, 0.0f, (glow & 16777215) | (((Color.alpha(glow) * Color.alpha(col)) / 255) << 24));
+        if (maxW > 0.0f) {
+            drawFit(c, s, x, y, maxW);
+        } else {
+            c.drawText(s, x, y, this.tp);
+        }
+        this.tp.clearShadowLayer();
+    }
+
+    /** Builds the cached backdrop shaders when the view size changes. */
+    void ovlEnsureBack() {
+        int key = (this.W * 8191) + this.H;
+        if (this.ovlBackSh == null || this.ovlBackKey != key) {
+            this.ovlBackKey = key;
+            int w = this.W;
+            int h = this.H;
+            this.ovlBackSh = new android.graphics.LinearGradient(0.0f, 0.0f, 0.0f, h, new int[]{-233173458, -301332972, -200998128}, new float[]{0.0f, 0.5f, 1.0f}, Shader.TileMode.CLAMP);
+            this.ovlVigSh = new RadialGradient(w / 2.0f, h * 0.45f, Math.max(1.0f, ((float) Math.hypot(w, h)) * 0.6f), new int[]{0, 0, -1442840576}, new float[]{0.0f, 0.5f, 1.0f}, Shader.TileMode.CLAMP);
+        }
+    }
+
+    /** Dim backdrop: cached vertical gradient + radial vignette + drifting motes. */
+    void ovlBackdrop(Canvas c, float a) {
+        int w = this.W;
+        int h = this.H;
+        if (w <= 0 || h <= 0) {
+            return;
+        }
+        ovlEnsureBack();
+        int A = ovlClampA(a * 255.0f);
+        this.ovlBackP.setShader(this.ovlBackSh);
+        this.ovlBackP.setAlpha(A);
+        c.drawRect(0.0f, 0.0f, w, h, this.ovlBackP);
+        this.ovlBackP.setShader(this.ovlVigSh);
+        this.ovlBackP.setAlpha(A);
+        c.drawRect(0.0f, 0.0f, w, h, this.ovlBackP);
+        this.ovlBackP.setShader(null);
+        this.ovlP.setStyle(Paint.Style.FILL);
+        this.ovlP.setColor(-5720);
+        for (int k = 0; k < 22; k++) {
+            float sp = (ovlHash(k, 3) * 0.035f) + 0.015f;
+            float y = h - ((((this.time * sp) + ovlHash(k, 2)) % 1.0f) * h);
+            float x = (ovlHash(k, 1) * w) + (((float) Math.sin((this.time * 0.6f) + (k * 1.7f))) * this.pad * 1.2f);
+            float s = this.pad * ((ovlHash(k, 4) * 0.2f) + 0.12f);
+            this.ovlP.setAlpha((int) (A * ((((float) Math.sin((this.time * 2.0f) + k)) * 0.1f) + 0.14f)));
+            c.drawRect(x - s, y - s, x + s, y + s, this.ovlP);
+        }
+    }
+
+    /** Rising wisps (souls / embers) inside a box. */
+    void ovlWisps(Canvas c, float l, float t, float r, float b, int n, int color, float a, int salt) {
+        if (r <= l || b <= t || a <= 0.0f) {
+            return;
+        }
+        float hh = b - t;
+        this.ovlP.setStyle(Paint.Style.FILL);
+        for (int k = 0; k < n; k++) {
+            float sp = (ovlHash(k, salt) * 0.12f) + 0.06f;
+            float ph = ((this.time * sp) + ovlHash(k, salt + 1)) % 1.0f;
+            float y = b - (ph * hh);
+            float x = l + (ovlHash(k, salt + 2) * (r - l)) + (((float) Math.sin((this.time * 1.3f) + (k * 2.1f))) * this.pad * 1.0f);
+            float s = this.pad * ((ovlHash(k, salt + 3) * 0.2f) + 0.15f);
+            float fa = ((float) Math.sin(ph * 3.141592653589793d)) * a;
+            this.ovlP.setColor(color);
+            this.ovlP.setAlpha((int) (fa * 150.0f));
+            c.drawRect(x - s, y - s, x + s, y + s, this.ovlP);
+            this.ovlP.setAlpha((int) (fa * 60.0f));
+            c.drawRect(x - (s * 0.6f), y + s, x + (s * 0.6f), (s * 3.0f) + y, this.ovlP);
+        }
+    }
+
+    /** Comet dot travelling around a rounded rect perimeter. */
+    void ovlComet(Canvas c, RectF rr, float ph, int color, int alpha) {
+        float w = rr.width();
+        float h = rr.height();
+        float per = (w + h) * 2.0f;
+        if (per <= 0.0f) {
+            return;
+        }
+        for (int k = 0; k < 6; k++) {
+            float d = ((((ph - (k * 0.012f)) % 1.0f) + 1.0f) % 1.0f) * per;
+            float x;
+            float y;
+            if (d < w) {
+                x = rr.left + d;
+                y = rr.top;
+            } else if (d < w + h) {
+                x = rr.right;
+                y = rr.top + (d - w);
+            } else if (d < (2.0f * w) + h) {
+                x = rr.right - (d - (w + h));
+                y = rr.bottom;
+            } else {
+                x = rr.left;
+                y = rr.bottom - (d - ((2.0f * w) + h));
+            }
+            float s = this.pad * (0.42f - (k * 0.055f));
+            this.ovlP.setStyle(Paint.Style.FILL);
+            this.ovlP.setColor(k == 0 ? -1 : color);
+            this.ovlP.setAlpha((alpha * (6 - k)) / 6);
+            c.drawRect(x - s, y - s, x + s, y + s, this.ovlP);
+        }
+    }
+
+    /** Animated pill toggle. pos 0 = off, 1 = on. */
+    void ovlSwitch(Canvas c, RectF rr, float pos) {
+        float h = rr.height();
+        float rad = h / 2.0f;
+        int track = ovlMix(-11911072, -12673970, pos);
+        this.ovlP.setStyle(Paint.Style.FILL);
+        if (pos > 0.05f) {
+            ovlGlow(c, rr.centerX(), rr.centerY(), rr.width() * 0.75f, -12673970, (int) (pos * 70.0f));
+        }
+        this.ovlR.set(rr.left, rr.top + (h * 0.08f), rr.right, rr.bottom + (h * 0.08f));
+        this.ovlP.setColor(-2013265920);
+        c.drawRoundRect(this.ovlR, rad, rad, this.ovlP);
+        this.ovlP.setColor(track);
+        c.drawRoundRect(rr, rad, rad, this.ovlP);
+        this.ovlR.set(rr.left + (h * 0.08f), rr.top + (h * 0.06f), rr.right - (h * 0.08f), rr.top + (h * 0.36f));
+        this.ovlP.setColor(-16777216);
+        this.ovlP.setAlpha(55);
+        c.drawRoundRect(this.ovlR, rad * 0.5f, rad * 0.5f, this.ovlP);
+        this.ovlS.setStyle(Paint.Style.STROKE);
+        this.ovlS.setStrokeWidth(Math.max(1.0f, h * 0.06f));
+        this.ovlS.setColor(ovlMix(track, -16777216, 0.4f));
+        c.drawRoundRect(rr, rad, rad, this.ovlS);
+        float m = h * 0.1f;
+        this.ovlP.setColor(-1);
+        this.ovlP.setAlpha((int) (pos * 200.0f));
+        c.drawRect((rr.left + rad) - (m * 0.35f), rr.centerY() - (h * 0.2f), rr.left + rad + (m * 0.35f), rr.centerY() + (h * 0.2f), this.ovlP);
+        this.ovlS.setColor(-1);
+        this.ovlS.setAlpha((int) ((1.0f - pos) * 160.0f));
+        c.drawCircle((rr.right - rad) + (h * 0.04f), rr.centerY(), h * 0.16f, this.ovlS);
+        float kr = h * 0.4f;
+        float kx = (rr.left + rad) + ((rr.width() - (rad * 2.0f)) * pos);
+        float ky = rr.centerY();
+        this.ovlP.setColor(-2013265920);
+        c.drawCircle(kx, (h * 0.08f) + ky, kr, this.ovlP);
+        this.ovlP.setColor(-3158065);
+        c.drawCircle(kx, ky, kr, this.ovlP);
+        this.ovlP.setColor(-1);
+        c.drawCircle(kx, ky - (kr * 0.12f), kr * 0.86f, this.ovlP);
+        this.ovlP.setColor(ovlMix(-7569238, -12673970, pos));
+        this.ovlP.setAlpha(200);
+        c.drawCircle(kx, ky, kr * 0.22f, this.ovlP);
+    }
+
+    /** Expanding shockwave ring. */
+    void ovlShock(Canvas c, float x, float y, float rad, float width, int color, int alpha) {
+        if (alpha <= 0 || rad <= 0.0f) {
+            return;
+        }
+        this.ovlS.setStyle(Paint.Style.STROKE);
+        this.ovlS.setStrokeWidth(Math.max(1.0f, width));
+        this.ovlS.setColor(color);
+        this.ovlS.setAlpha(Math.min(255, alpha));
+        c.drawCircle(x, y, rad, this.ovlS);
+        this.ovlS.setStrokeWidth(Math.max(1.0f, width * 0.35f));
+        this.ovlS.setColor(-1);
+        this.ovlS.setAlpha(Math.min(255, alpha));
+        c.drawCircle(x, y, rad, this.ovlS);
+    }
+
+    /** Radial impact burst lines. */
+    void ovlBurst(Canvas c, float x, float y, float r0, float r1, int n, float rotDeg, int color, int alpha, float width) {
+        if (alpha <= 0 || r1 <= r0) {
+            return;
+        }
+        this.ovlS.setStyle(Paint.Style.STROKE);
+        this.ovlS.setStrokeCap(Paint.Cap.ROUND);
+        this.ovlS.setStrokeWidth(Math.max(1.0f, width));
+        this.ovlS.setColor(color);
+        this.ovlS.setAlpha(Math.min(255, alpha));
+        double rot = Math.toRadians(rotDeg);
+        for (int k = 0; k < n; k++) {
+            double a = rot + ((k * 6.283185307179586d) / n);
+            float ca = (float) Math.cos(a);
+            float sa = (float) Math.sin(a);
+            float rr1 = r1 * ((k % 3 == 0) ? 1.0f : 0.75f);
+            c.drawLine((ca * r0) + x, (sa * r0) + y, (ca * rr1) + x, (sa * rr1) + y, this.ovlS);
+        }
+        this.ovlS.setStrokeCap(Paint.Cap.BUTT);
+    }
+
     void drawOverlay(Canvas canvas) {
         int i;
         int i2;
@@ -8189,18 +8708,34 @@ public class GameView extends View implements Runnable {
             this.p.setAlpha((int) (max * 255.0f));
             canvas.drawRect(0.0f, 0.0f, this.W, this.H, this.p);
             this.p.setAlpha(255);
+            if (max > 0.0f && this.W > 0 && this.H > 0) {
+                int dkey = (this.W * 8191) + this.H;
+                if (this.ovlDeathSh == null || this.ovlDeathKey != dkey) {
+                    this.ovlDeathKey = dkey;
+                    this.ovlDeathSh = new RadialGradient(this.W / 2.0f, this.H * 0.47f, Math.max(1.0f, ((float) Math.hypot(this.W, this.H)) * 0.58f), new int[]{0, 805961744, -1056569320}, new float[]{0.0f, 0.55f, 1.0f}, Shader.TileMode.CLAMP);
+                }
+                this.ovlBackP.setShader(this.ovlDeathSh);
+                this.ovlBackP.setAlpha((int) (max * 255.0f));
+                canvas.drawRect(0.0f, 0.0f, this.W, this.H, this.ovlBackP);
+                this.ovlBackP.setShader(null);
+                ovlGlow(canvas, this.W / 2.0f, this.H * 0.47f, this.W * 0.55f, -7395302, (int) (max * 70.0f));
+                ovlWisps(canvas, 0.0f, this.H * 0.15f, this.W, this.H, 26, -32704, max, 11);
+            }
             float f = this.deathT;
             if (f > 2.5f) {
                 float min = Math.min(1.0f, (f - 2.5f) * 3.0f);
                 this.tp.setTextAlign(Paint.Align.CENTER);
-                this.tp.setTextSize(this.pad * 2.8f);
+                this.tp.setTextSize(this.pad * 2.8f * ((1.0f - min) * 0.25f + 1.0f));
                 this.tp.setFakeBoldText(true);
                 this.tp.setColor(-1);
                 int i4 = (int) (min * 255.0f);
                 this.tp.setAlpha(i4);
                 String str = this.deathCap;
                 int i5 = this.W;
-                drawFit(canvas, str, i5 / 2.0f, 0.45f * this.H, i5 - (this.pad * 4.0f));
+                ovlTitle(canvas, str, i5 / 2.0f, 0.45f * this.H, i5 - (this.pad * 4.0f), -2672576);
+                this.tp.setTextSize(this.pad * 2.8f);
+                float ovlEase = 1.0f - ((1.0f - min) * (1.0f - min));
+                ovlDivider(canvas, this.W / 2.0f, this.H * 0.475f, this.W * 0.3f * ovlEase, -2672576, i4);
                 this.tp.setFakeBoldText(false);
                 this.tp.setTextSize(this.pad * 1.8f);
                 this.tp.setColor(-4609816);
@@ -8221,11 +8756,19 @@ public class GameView extends View implements Runnable {
             }
             return;
         }
-        this.p.setColor(-301332972);
-        canvas.drawRect(0.0f, 0.0f, this.W, this.H, this.p);
+        float ovlA = ovlOpenT(220.0f);
+        ovlBackdrop(canvas, (ovlA * 0.45f) + 0.55f);
         this.tp.setTextAlign(Paint.Align.CENTER);
         int i6 = this.overlay;
+        int ovlSave = canvas.save();
+        if (i6 != 9 && i6 != 12) {
+            float ovlS0 = (ovlEaseBack(ovlOpenT(320.0f)) * 0.1f) + 0.9f;
+            canvas.scale(ovlS0, ovlS0, this.W / 2.0f, this.H / 2.0f);
+        }
+        try {
         if (i6 == 1) {
+            ovlFrame(canvas, this.pad * 1.2f, this.H * 0.12f, this.W - (this.pad * 1.2f), this.H * 0.9f, -3624896, ovlA);
+            ovlGlow(canvas, this.W / 2.0f, this.H * 0.42f, this.W * 0.42f, -11430, (int) ((Math.sin(this.time * 1.2f) * 8.0d) + 26.0d));
             if (this.storyTitle != null) {
                 this.tp.setColor(-11430);
                 this.tp.setTextSize(this.pad * 2.4f);
@@ -8233,8 +8776,9 @@ public class GameView extends View implements Runnable {
                 String str2 = this.storyTitle;
                 int i7 = this.W;
                 i2 = -7569238;
-                drawFit(canvas, str2, i7 / 2.0f, 0.2f * this.H, i7 - (this.pad * 4.0f));
+                ovlTitle(canvas, str2, i7 / 2.0f, 0.2f * this.H, i7 - (this.pad * 4.0f), -2058456);
                 this.tp.setFakeBoldText(false);
+                ovlDivider(canvas, this.W / 2.0f, (this.H * 0.2f) + (this.pad * 1.6f), this.W * 0.28f, -3624896, (int) (ovlA * 255.0f));
             } else {
                 i2 = -7569238;
             }
@@ -8243,8 +8787,10 @@ public class GameView extends View implements Runnable {
             long uptimeMillis = SystemClock.uptimeMillis();
             this.tp.setColor(-1);
             this.tp.setTextSize(this.pad * SUPER_END);
-            this.tp.setAlpha((int) (Math.min(1.0f, (uptimeMillis - this.storyPageAt) / 400.0f) * 255.0f));
-            float length = (this.H * 0.42f) - ((split.length * this.pad) * 2.0f);
+            float ovlPg = Math.min(1.0f, Math.max(0.0f, (uptimeMillis - this.storyPageAt) / 400.0f));
+            this.tp.setAlpha((int) (ovlPg * 255.0f));
+            this.tp.setShadowLayer(this.pad * 0.35f, 0.0f, this.pad * 0.25f, ((int) (ovlPg * 200.0f)) << 24);
+            float length = ((this.H * 0.42f) - ((split.length * this.pad) * 2.0f)) + ((1.0f - ovlPg) * (1.0f - ovlPg) * this.pad * 1.5f);
             int length2 = split.length;
             float f3 = length;
             int i8 = OV_NONE;
@@ -8256,20 +8802,50 @@ public class GameView extends View implements Runnable {
                 i8++;
                 uptimeMillis = uptimeMillis;
             }
+            this.tp.clearShadowLayer();
             this.tp.setAlpha(255);
             this.tp.setTextSize(this.pad * 1.7f);
             this.tp.setColor(i2);
-            this.tp.setAlpha(storyTapReady(uptimeMillis) ? (int) ((Math.sin(this.time * 4.0f) * 100.0d) + 150.0d) : OV_NONE);
+            boolean ovlReady = storyTapReady(uptimeMillis);
+            int ovlHintA = ovlReady ? (int) ((Math.sin(this.time * 4.0f) * 100.0d) + 150.0d) : OV_NONE;
+            this.tp.setAlpha(ovlHintA);
             canvas.drawText("тап — дальше   (" + (this.storyPage + 1) + "/" + this.storyCur.length + ")", this.W / 2.0f, this.H * 0.85f, this.tp);
             this.tp.setAlpha(255);
+            if (ovlReady) {
+                float ovlBob = ((float) Math.abs(Math.sin(this.time * 4.0f))) * this.pad * 0.5f;
+                float ovlTx = this.W / 2.0f;
+                float ovlTy = (this.H * 0.85f) + (this.pad * 1.0f) + ovlBob;
+                this.ovlPath.reset();
+                this.ovlPath.moveTo(ovlTx - (this.pad * 0.7f), ovlTy);
+                this.ovlPath.lineTo((this.pad * 0.7f) + ovlTx, ovlTy);
+                this.ovlPath.lineTo(ovlTx, (this.pad * 0.7f) + ovlTy);
+                this.ovlPath.close();
+                this.ovlP.setStyle(Paint.Style.FILL);
+                this.ovlP.setColor(-11430);
+                this.ovlP.setAlpha(ovlHintA);
+                canvas.drawPath(this.ovlPath, this.ovlP);
+            }
+            int ovlN = this.storyCur.length;
+            if (ovlN > 1 && ovlN < 30) {
+                float ovlDx = this.pad * 1.4f;
+                float ovlX0 = (this.W / 2.0f) - (((ovlN - 1) * ovlDx) / 2.0f);
+                for (int ovlK = 0; ovlK < ovlN; ovlK++) {
+                    boolean ovlCur = ovlK == this.storyPage;
+                    ovlGem(canvas, (ovlK * ovlDx) + ovlX0, this.H * 0.885f, this.pad * (ovlCur ? 0.38f : 0.24f), ovlK <= this.storyPage ? -11430 : -12963760, (int) (ovlA * 255.0f));
+                }
+            }
             return;
         }
         if (i6 == 2) {
+            ovlFrame(canvas, this.pad * 1.5f, this.H * 0.2f, this.W - (this.pad * 1.5f), this.H * 0.745f, -8395009, ovlA);
+            ovlWisps(canvas, this.pad * 3.0f, this.H * 0.22f, this.W - (this.pad * 3.0f), this.H * 0.58f, 14, -8395009, ovlA * 0.8f, 21);
+            ovlGlow(canvas, this.W / 2.0f, this.H * 0.27f, this.W * 0.3f, -8395009, (int) ((Math.sin(this.time * 2.0f) * 12.0d) + 40.0d));
             this.tp.setColor(-8395009);
             this.tp.setTextSize(this.pad * 3.2f);
             this.tp.setFakeBoldText(true);
-            canvas.drawText("Реинкарнация", this.W / 2.0f, this.H * 0.28f, this.tp);
+            ovlTitle(canvas, "Реинкарнация", this.W / 2.0f, this.H * 0.28f, 0.0f, -11563047);
             this.tp.setFakeBoldText(false);
+            ovlDivider(canvas, this.W / 2.0f, (this.H * 0.28f) + (this.pad * 1.8f), this.W * 0.26f, -8395009, (int) (ovlA * 255.0f));
             this.tp.setColor(-1);
             this.tp.setTextSize(this.pad * 2.0f);
             canvas.drawText("Ты потеряешь золото, ману и улучшения,", this.W / 2.0f, this.H * 0.36f, this.tp);
@@ -8285,10 +8861,7 @@ public class GameView extends View implements Runnable {
             float f4 = this.pad;
             int i10 = this.H;
             rectF.set(f4 * 3.0f, i10 * 0.6f, (this.W / 2.0f) - (f4 * 1.5f), i10 * 0.7f);
-            this.p.setColor(-12963760);
-            RectF rectF2 = this.r;
-            float f5 = this.pad;
-            canvas.drawRoundRect(rectF2, f5 * 1.5f, f5 * 1.5f, this.p);
+            ovlButton(canvas, this.r, -12963760, false);
             this.tp.setColor(-1);
             this.tp.setTextSize(this.pad * 2.2f);
             canvas.drawText("Ещё поживу", this.r.centerX(), this.r.centerY() + (this.pad * 0.8f), this.tp);
@@ -8297,18 +8870,17 @@ public class GameView extends View implements Runnable {
             float f6 = this.pad;
             int i12 = this.H;
             rectF3.set((i11 / 2.0f) + (f6 * 1.5f), i12 * 0.6f, i11 - (f6 * 3.0f), i12 * 0.7f);
-            this.p.setColor(-11563047);
-            RectF rectF4 = this.r;
-            float f7 = this.pad;
-            canvas.drawRoundRect(rectF4, f7 * 1.5f, f7 * 1.5f, this.p);
+            ovlButton(canvas, this.r, -11563047, true);
+            this.tp.setColor(-1);
             canvas.drawText("Переродиться", this.r.centerX(), this.r.centerY() + (this.pad * 0.8f), this.tp);
             return;
         }
         if (i6 == 5) {
+            ovlFrame(canvas, this.pad * 0.8f, this.H * 0.085f, this.W - (this.pad * 0.8f), this.H * 0.965f, -3624896, ovlA);
             this.tp.setColor(-11430);
             this.tp.setTextSize(this.pad * 3.2f);
             this.tp.setFakeBoldText(true);
-            canvas.drawText("🎒 Реликвии", this.W / 2.0f, this.H * 0.14f, this.tp);
+            ovlTitle(canvas, "🎒 Реликвии", this.W / 2.0f, this.H * 0.14f, 0.0f, -2058456);
             this.tp.setFakeBoldText(false);
             this.tp.setColor(-4609816);
             this.tp.setTextSize(this.pad * 1.7f);
@@ -8324,12 +8896,44 @@ public class GameView extends View implements Runnable {
                 this.p.setColor(z ? -13753520 : -15068112);
                 RectF rectF5 = this.r;
                 float f13 = this.pad;
-                canvas.drawRoundRect(rectF5, f13 * IMPACT, f13 * IMPACT, this.p);
                 if (z) {
-                    this.p.setColor(REL_COLOR[i13]);
-                    this.p.setAlpha(60);
-                    canvas.drawCircle(this.r.centerX(), (f9 * 0.3f) + f12, 0.2f * f9, this.p);
-                    this.p.setAlpha(255);
+                    panel(canvas, rectF5, f13 * IMPACT, -13753520);
+                    ovlGlow(canvas, this.r.centerX(), (f9 * 0.3f) + f12, 0.36f * f9, REL_COLOR[i13], (int) ((Math.sin((this.time * 2.2f) + i13) * 30.0d) + 120.0d));
+                    ovlRays(canvas, this.r.centerX(), (f9 * 0.3f) + f12, 0.34f * f9, 8, (this.time * 18.0f) + (i13 * 20), 0.12f, REL_COLOR[i13], 40);
+                    this.ovlS.setStyle(Paint.Style.STROKE);
+                    this.ovlS.setStrokeWidth(Math.max(1.0f, this.pad * 0.2f));
+                    this.ovlS.setColor(REL_COLOR[i13]);
+                    this.ovlS.setAlpha(this.rel[i13] >= 10 ? (int) ((Math.sin(this.time * 4.0f) * 60.0d) + 180.0d) : 130);
+                    canvas.drawRoundRect(this.r, this.pad * IMPACT, this.pad * IMPACT, this.ovlS);
+                    float ovlPh = ((this.time * 0.35f) + (i13 * 0.37f)) % 2.0f;
+                    if (ovlPh < 1.0f) {
+                        float ovlX = (this.r.left - (f9 * 0.4f)) + ((f8 + (f9 * 0.8f)) * ovlPh);
+                        canvas.save();
+                        canvas.clipRect(this.r);
+                        this.ovlPath.reset();
+                        this.ovlPath.moveTo(ovlX, this.r.bottom);
+                        this.ovlPath.lineTo((f9 * 0.35f) + ovlX, this.r.top);
+                        this.ovlPath.lineTo((f9 * 0.47f) + ovlX, this.r.top);
+                        this.ovlPath.lineTo((f9 * 0.12f) + ovlX, this.r.bottom);
+                        this.ovlPath.close();
+                        this.ovlP.setStyle(Paint.Style.FILL);
+                        this.ovlP.setColor(-1);
+                        this.ovlP.setAlpha(26);
+                        canvas.drawPath(this.ovlPath, this.ovlP);
+                        canvas.restore();
+                    }
+                    if (this.rel[i13] >= 10) {
+                        ovlSpark(canvas, this.r.right - (this.pad * 1.4f), this.r.top + (this.pad * 1.4f), this.pad * ((((float) Math.sin((this.time * 5.0f) + i13)) * 0.25f) + 0.75f), -5720, 230);
+                        ovlSpark(canvas, this.r.left + (this.pad * 1.4f), this.r.bottom - (this.pad * 1.4f), this.pad * ((((float) Math.sin((this.time * 5.0f) + i13 + 2.0f)) * 0.25f) + 0.6f), -5720, 200);
+                    }
+                } else {
+                    canvas.drawRoundRect(rectF5, f13 * IMPACT, f13 * IMPACT, this.p);
+                    this.ovlS.setStyle(Paint.Style.STROKE);
+                    this.ovlS.setStrokeWidth(Math.max(1.0f, this.pad * 0.15f));
+                    this.ovlS.setColor(-13753520);
+                    this.ovlS.setAlpha(255);
+                    this.ovlR.set(this.r.left + (this.pad * 0.5f), this.r.top + (this.pad * 0.5f), this.r.right - (this.pad * 0.5f), this.r.bottom - (this.pad * 0.5f));
+                    canvas.drawRoundRect(this.ovlR, this.pad * 0.8f, this.pad * 0.8f, this.ovlS);
                 }
                 this.tp.setTextAlign(Paint.Align.CENTER);
                 this.tp.setTextSize(0.25f * f9);
@@ -8354,7 +8958,22 @@ public class GameView extends View implements Runnable {
                 float f14 = this.pad;
                 int i14 = this.H;
                 rectF6.set(f14 * 2.0f, i14 * 0.83f, this.W - (f14 * 2.0f), i14 * 0.89f);
+                if (this.phonesOn) {
+                    ovlGlow(canvas, this.phonesBtn.centerX(), this.phonesBtn.centerY(), this.phonesBtn.width() * 0.6f, -7722390, (int) ((Math.sin(this.time * 5.0f) * 30.0d) + 70.0d));
+                }
                 panel(canvas, this.phonesBtn, this.pad * IMPACT, this.phonesOn ? -7722390 : -13753520);
+                if (this.phonesOn) {
+                    for (int ovlK = 0; ovlK < 3; ovlK++) {
+                        float ovlPh = ((this.time * 0.8f) + (ovlK / 3.0f)) % 1.0f;
+                        this.ovlP.setStyle(Paint.Style.FILL);
+                        this.ovlP.setColor(-20264);
+                        this.ovlP.setAlpha((int) ((1.0f - ovlPh) * 200.0f));
+                        float ovlNx = this.phonesBtn.left + (this.pad * (2.0f + (ovlK * 1.6f)));
+                        float ovlNy = this.phonesBtn.top - (ovlPh * this.pad * 2.5f);
+                        canvas.drawRect(ovlNx, ovlNy - (this.pad * 0.9f), (this.pad * 0.2f) + ovlNx, ovlNy, this.ovlP);
+                        canvas.drawRect(ovlNx - (this.pad * 0.45f), ovlNy - (this.pad * 0.2f), ovlNx + (this.pad * 0.2f), (this.pad * 0.2f) + ovlNy, this.ovlP);
+                    }
+                }
                 float height = (this.phonesBtn.height() * 0.7f) / this.icPhones.getWidth();
                 i = -7569238;
                 blit(canvas, this.icPhones, this.phonesBtn.left + (this.pad * 3.5f), this.phonesBtn.centerY() + ((this.icPhones.getHeight() * height) / 2.0f), height, 1.0f, 1.0f, this.bp);
@@ -8378,10 +8997,12 @@ public class GameView extends View implements Runnable {
         }
         if (i6 == 4) {
             int dailyDay = dailyDay();
+            ovlFrame(canvas, this.pad * 1.0f, this.H * 0.175f, this.W - (this.pad * 1.0f), this.H * 0.875f, -3624896, ovlA);
+            ovlRays(canvas, this.W / 2.0f, this.H * 0.235f, this.W * 0.32f, 14, this.time * 12.0f, 0.09f, -11430, 22);
             this.tp.setColor(-11430);
             this.tp.setTextSize(this.pad * 3.2f);
             this.tp.setFakeBoldText(true);
-            canvas.drawText("🎁 Ежедневный подарок", this.W / 2.0f, this.H * 0.25f, this.tp);
+            ovlTitle(canvas, "🎁 Ежедневный подарок", this.W / 2.0f, this.H * 0.25f, 0.0f, -2058456);
             this.tp.setFakeBoldText(false);
             this.tp.setColor(-4609816);
             this.tp.setTextSize(this.pad * 1.9f);
@@ -8396,10 +9017,29 @@ public class GameView extends View implements Runnable {
                 int i17 = i16 - 1;
                 int i18 = this.H;
                 rectF7.set((f16 * 2.0f) + (i17 * f15) + (f16 * 0.3f), i18 * 0.35f, ((f16 * 2.0f) + (i16 * f15)) - (f16 * 0.3f), (i18 * 0.35f) + (1.4f * f15));
-                this.p.setColor(i16 == dailyDay ? -4158934 : i16 < dailyDay ? -14015424 : -14411203);
+                if (i16 == dailyDay) {
+                    this.r.offset(0.0f, (-((float) Math.abs(Math.sin(this.time * 3.0f)))) * this.pad * 0.5f);
+                    ovlGlow(canvas, this.r.centerX(), this.r.centerY(), f15 * 1.2f, -11430, (int) ((Math.sin(this.time * 3.0f) * 30.0d) + 110.0d));
+                    ovlRays(canvas, this.r.centerX(), this.r.centerY(), f15 * 1.1f, 10, this.time * 40.0f, 0.12f, -5720, 50);
+                }
+                int ovlDc = i16 == dailyDay ? -4158934 : i16 < dailyDay ? -14015424 : -14411203;
+                this.p.setColor(ovlDc);
                 RectF rectF8 = this.r;
                 float f17 = this.pad;
-                canvas.drawRoundRect(rectF8, f17, f17, this.p);
+                panel(canvas, rectF8, f17, ovlDc);
+                if (i16 == 7 && i16 != dailyDay) {
+                    this.ovlS.setStyle(Paint.Style.STROKE);
+                    this.ovlS.setStrokeWidth(Math.max(1.0f, this.pad * 0.18f));
+                    this.ovlS.setColor(-8395009);
+                    this.ovlS.setAlpha((int) ((Math.sin(this.time * 2.5f) * 50.0d) + 120.0d));
+                    canvas.drawRoundRect(this.r, f17, f17, this.ovlS);
+                }
+                if (i16 < dailyDay) {
+                    this.ovlP.setStyle(Paint.Style.FILL);
+                    this.ovlP.setColor(-8592501);
+                    this.ovlP.setAlpha(40);
+                    canvas.drawRoundRect(this.r, f17, f17, this.ovlP);
+                }
                 if (i16 == dailyDay) {
                     this.p.setStyle(Paint.Style.STROKE);
                     this.p.setStrokeWidth(this.pad * 0.4f);
@@ -8432,10 +9072,11 @@ public class GameView extends View implements Runnable {
             int i20 = this.W;
             int i21 = this.H;
             rectF10.set(i20 * 0.25f, i21 * 0.6f, i20 * 0.75f, i21 * 0.68f);
-            this.p.setColor(-4158934);
-            RectF rectF11 = this.r;
-            float f21 = this.pad;
-            canvas.drawRoundRect(rectF11, f21 * 1.5f, f21 * 1.5f, this.p);
+            ovlButton(canvas, this.r, -4158934, true);
+            for (int ovlK = 0; ovlK < 4; ovlK++) {
+                double ovlA2 = (this.time * 1.4f) + (ovlK * 1.5707963267948966d);
+                ovlSpark(canvas, this.r.centerX() + (((float) Math.cos(ovlA2)) * this.r.width() * 0.56f), this.r.centerY() + (((float) Math.sin(ovlA2)) * this.r.height() * 0.75f), this.pad * ((((float) Math.sin((this.time * 6.0f) + ovlK)) * 0.25f) + 0.55f), -5720, 200);
+            }
             this.tp.setColor(-1);
             this.tp.setTextSize(this.pad * 2.4f);
             this.tp.setFakeBoldText(true);
@@ -8474,10 +9115,19 @@ public class GameView extends View implements Runnable {
         }
         if (i6 == 7) {
             int starsGain = starsGain();
+            ovlFrame(canvas, this.pad * 1.5f, this.H * 0.19f, this.W - (this.pad * 1.5f), this.H * 0.795f, -5720, ovlA);
+            for (int ovlK = 0; ovlK < 14; ovlK++) {
+                float ovlTw = (float) Math.sin((this.time * 2.5f) + (ovlK * 1.9f));
+                if (ovlTw > 0.2f) {
+                    ovlSpark(canvas, (this.pad * 3.0f) + (ovlHash(ovlK, 31) * (this.W - (this.pad * 6.0f))), (this.H * 0.2f) + (ovlHash(ovlK, 32) * this.H * 0.44f), this.pad * 0.5f * ovlTw, -5720, (int) (ovlTw * 120.0f * ovlA));
+                }
+            }
+            ovlRays(canvas, this.W / 2.0f, this.H * 0.25f, this.W * 0.36f, 16, this.time * -10.0f, 0.07f, -5720, 26);
+            ovlGlow(canvas, this.W / 2.0f, this.H * 0.25f, this.W * 0.3f, -5720, (int) ((Math.sin(this.time * 2.0f) * 15.0d) + 45.0d));
             this.tp.setColor(-5720);
             this.tp.setTextSize(this.pad * 3.4f);
             this.tp.setFakeBoldText(true);
-            canvas.drawText("✦ Вознесение", this.W / 2.0f, this.H * 0.26f, this.tp);
+            ovlTitle(canvas, "✦ Вознесение", this.W / 2.0f, this.H * 0.26f, 0.0f, -7712808);
             this.tp.setFakeBoldText(false);
             this.tp.setColor(-1);
             this.tp.setTextSize(this.pad * 1.9f);
@@ -8504,10 +9154,7 @@ public class GameView extends View implements Runnable {
             float f22 = this.pad;
             int i25 = this.H;
             rectF12.set(f22 * 3.0f, i25 * 0.66f, (this.W / 2.0f) - (f22 * 1.5f), i25 * 0.76f);
-            this.p.setColor(-12963760);
-            RectF rectF13 = this.r;
-            float f23 = this.pad;
-            canvas.drawRoundRect(rectF13, f23 * 1.5f, f23 * 1.5f, this.p);
+            ovlButton(canvas, this.r, -12963760, false);
             this.tp.setColor(-1);
             this.tp.setTextSize(this.pad * 2.2f);
             canvas.drawText("Не сейчас", this.r.centerX(), this.r.centerY() + (this.pad * 0.8f), this.tp);
@@ -8516,15 +9163,18 @@ public class GameView extends View implements Runnable {
             float f24 = this.pad;
             int i27 = this.H;
             rectF14.set((i26 / 2.0f) + (f24 * 1.5f), i27 * 0.66f, i26 - (f24 * 3.0f), i27 * 0.76f);
-            this.p.setColor(-7712808);
-            RectF rectF15 = this.r;
-            float f25 = this.pad;
-            canvas.drawRoundRect(rectF15, f25 * 1.5f, f25 * 1.5f, this.p);
+            ovlButton(canvas, this.r, -7712808, true);
+            this.tp.setColor(-1);
             canvas.drawText("Вознестись", this.r.centerX(), this.r.centerY() + (this.pad * 0.8f), this.tp);
             return;
         }
         if (i6 != 8) {
             if (i6 == 3) {
+                ovlWisps(canvas, 0.0f, this.H * 0.1f, this.W, this.H, 30, -8395009, ovlA, 41);
+                float ovlBr = (((float) Math.sin(this.time * 1.6f)) * 0.08f) + 0.92f;
+                ovlRays(canvas, this.W / 2.0f, this.H * 0.49f, this.W * 0.62f * ovlBr * ovlA, 18, this.time * 8.0f, 0.06f, -8395009, 24);
+                ovlGlow(canvas, this.W / 2.0f, this.H * 0.49f, this.W * 0.45f * ovlBr, -8395009, (int) (70.0f * ovlA));
+                ovlGlow(canvas, this.W / 2.0f, this.H * 0.49f, this.W * 0.16f * ovlBr, -1, (int) (60.0f * ovlA));
                 this.tp.setColor(-1);
                 this.tp.setTextSize(this.pad * 2.4f);
                 canvas.drawText("Тьма... тишина...", this.W / 2.0f, this.H * 0.36f, this.tp);
@@ -8532,7 +9182,8 @@ public class GameView extends View implements Runnable {
                 this.tp.setColor(-8395009);
                 this.tp.setTextSize(this.pad * 3.0f);
                 this.tp.setFakeBoldText(true);
-                canvas.drawText("Жизнь №" + this.lifeNo, this.W / 2.0f, this.H * 0.5f, this.tp);
+                ovlTitle(canvas, "Жизнь №" + this.lifeNo, this.W / 2.0f, this.H * 0.5f, 0.0f, -11563047);
+                ovlDivider(canvas, this.W / 2.0f, (this.H * 0.5f) + (this.pad * 1.6f), this.W * 0.22f * ovlA, -8395009, (int) (ovlA * 255.0f));
                 this.tp.setFakeBoldText(false);
                 this.tp.setColor(-11430);
                 this.tp.setTextSize(this.pad * 2.0f);
@@ -8547,6 +9198,9 @@ public class GameView extends View implements Runnable {
             }
             return;
         }
+        ovlRays(canvas, this.W / 2.0f, this.H * 0.475f, this.W * 0.7f * ovlA, 20, this.time * 12.0f, 0.07f, -5720, 34);
+        ovlGlow(canvas, this.W / 2.0f, this.H * 0.475f, this.W * 0.5f, -11430, (int) ((Math.sin(this.time * 2.0f) * 15.0d) + 65.0d));
+        ovlWisps(canvas, 0.0f, 0.0f, this.W, this.H, 18, -5720, ovlA, 51);
         for (int i28 = OV_NONE; i28 < 40; i28++) {
             double d = i28;
             float sin = (((float) (((Math.sin(12.9898d * d) * 43758.5453d) % 1.0d) + 1.0d)) % 1.0f) * this.W;
@@ -8554,6 +9208,12 @@ public class GameView extends View implements Runnable {
             this.p.setColor(-5720);
             this.p.setAlpha((int) ((Math.sin((this.time * 3.0f) + i28) * 120.0d) + 120.0d));
             canvas.drawCircle(sin, sin2, this.pad * 0.3f, this.p);
+            if (i28 % 4 == 0) {
+                float ovlTw = (float) Math.sin((this.time * 3.0f) + i28);
+                if (ovlTw > 0.5f) {
+                    ovlSpark(canvas, sin, sin2, this.pad * 1.1f * ovlTw, -5720, (int) ((ovlTw - 0.5f) * 400.0f));
+                }
+            }
         }
         this.p.setAlpha(255);
         this.tp.setColor(-1);
@@ -8565,7 +9225,9 @@ public class GameView extends View implements Runnable {
         this.tp.setFakeBoldText(true);
         StringBuilder append2 = new StringBuilder().append("✦ ").append(this.stars).append(" ");
         int i29 = this.stars;
+        this.tp.setShadowLayer(this.pad * 1.2f, 0.0f, 0.0f, -11430);
         canvas.drawText(append2.append((i29 % 10 != 1 || i29 % 100 == 11) ? (i29 % 10 < 2 || i29 % 10 > 4 || (i29 % 100 >= 12 && i29 % 100 <= OV_SETTINGS)) ? "звёзд" : "звезды" : "звезда").toString(), this.W / 2.0f, this.H * 0.49f, this.tp);
+        this.tp.clearShadowLayer();
         this.tp.setFakeBoldText(false);
         this.tp.setTextSize(this.pad * 2.0f);
         this.tp.setColor(-11430);
@@ -8573,14 +9235,19 @@ public class GameView extends View implements Runnable {
         this.tp.setTextSize(this.pad * 1.7f);
         this.tp.setColor(-7569238);
         canvas.drawText("тап — начать заново, но уже легендой", this.W / 2.0f, this.H * 0.85f, this.tp);
+        } finally {
+            canvas.restoreToCount(ovlSave);
+        }
     }
 
     void drawParty(Canvas var1) {
+       float ovlA = this.ovlOpenT(220.0F);
+       this.ovlFrame(var1, this.pad * 0.8F, (float)this.H * 0.05F, (float)this.W - this.pad * 0.8F, (float)this.H * 0.895F, -25909, ovlA);
        this.tp.setTextAlign(Align.CENTER);
        this.tp.setColor(-25909);
        this.tp.setTextSize(this.pad * 3.2F);
        this.tp.setFakeBoldText(true);
-       var1.drawText("\ud83d\udc6d Спутницы", (float)this.W / 2.0F, (float)this.H * 0.1F, this.tp);
+       this.ovlTitle(var1, "\ud83d\udc6d Спутницы", (float)this.W / 2.0F, (float)this.H * 0.1F, 0.0F, -45149);
        this.tp.setFakeBoldText(false);
        this.tp.setTextSize(this.pad * 1.55F);
        this.tp.setColor(-4609816);
@@ -8620,8 +9287,33 @@ public class GameView extends View implements Runnable {
              var9 = -15068112;
           }
 
+          if (var11) {
+             this.ovlGlow(var1, var15.centerX(), var15.centerY(), var15.width() * 0.62F, -25909, (int)(Math.sin((double)(this.time * 3.0F)) * 20.0 + 60.0));
+          }
+
           this.panel(var1, var15, var2 * 1.4F, var9);
+          if (var11) {
+             this.ovlS.setStyle(Style.STROKE);
+             this.ovlS.setStrokeWidth(Math.max(1.0F, this.pad * 0.25F));
+             this.ovlS.setColor(-11430);
+             this.ovlS.setAlpha((int)(Math.sin((double)(this.time * 4.0F)) * 50.0 + 190.0));
+             var1.drawRoundRect(var15, this.pad * 1.4F, this.pad * 1.4F, this.ovlS);
+             this.ovlComet(var1, var15, this.time * 0.18F, -11430, 230);
+             this.ovlComet(var1, var15, this.time * 0.18F + 0.5F, -25909, 200);
+          } else if (!var14) {
+             this.ovlP.setStyle(Style.FILL);
+             this.ovlP.setColor(-16777216);
+             this.ovlP.setAlpha(60);
+             var1.drawRoundRect(var15, this.pad * 1.4F, this.pad * 1.4F, this.ovlP);
+          }
+
           Bitmap var16 = this.bmComp[var13];
+          if (var16 == null) {
+             var10++;
+             var2 = var3;
+             continue;
+          }
+
           float var7 = (var4 - this.pad * 2.5F) / (float)var16.getHeight();
           var5 = this.partyRows[var10].left;
           float var8 = this.pad;
@@ -8635,7 +9327,30 @@ public class GameView extends View implements Runnable {
           }
 
           var9 = -9543024;
-          this.blit(var1, var16, var5 + var8 * 5.0F, var6 - var2 * 0.8F, var7, 1.0F, 1.0F, var32);
+          float ovlCx = var5 + var8 * 5.0F;
+          float ovlFoot = var6 - var2 * 0.8F;
+          float ovlSh = (float)var16.getWidth() * var7 * 0.45F;
+          this.ovlP.setStyle(Style.FILL);
+          this.ovlP.setColor(-16777216);
+          this.ovlP.setAlpha(90);
+          this.ovlR.set(ovlCx - ovlSh, ovlFoot - this.pad * 0.35F, ovlCx + ovlSh, ovlFoot + this.pad * 0.35F);
+          var1.drawOval(this.ovlR, this.ovlP);
+          float ovlBob = 0.0F;
+          if (var14) {
+             this.ovlGlow(var1, ovlCx, ovlFoot - (float)var16.getHeight() * var7 * 0.5F, var4 * 0.5F, var11 ? -11430 : -25909, var11 ? 110 : 45);
+          }
+
+          if (var11) {
+             ovlBob = (float)Math.abs(Math.sin((double)(this.time * 3.0F))) * this.pad * 0.6F;
+             for (int ovlK = 0; ovlK < 3; ovlK++) {
+                float ovlTw = (float)Math.sin((double)(this.time * 4.0F + (float)ovlK * 2.1F));
+                if (ovlTw > 0.0F) {
+                   this.ovlSpark(var1, ovlCx + (float)(ovlK - 1) * this.pad * 2.6F, ovlFoot - var4 * (0.45F + 0.2F * (float)(ovlK % 2)), this.pad * 0.7F * ovlTw, -5720, (int)(ovlTw * 220.0F));
+                }
+             }
+          }
+
+          this.blit(var1, var16, ovlCx, ovlFoot - ovlBob, var7, 1.0F, 1.0F, var32);
           var6 = this.partyRows[var10].left + this.pad * 10.0F;
           this.tp.setTextAlign(Align.LEFT);
           this.tp.setFakeBoldText(true);
@@ -8742,28 +9457,39 @@ public class GameView extends View implements Runnable {
         }
         float f4 = this.W / 2.0f;
         float sin = ((float) Math.sin(this.time * 1.6f)) * this.pad * 0.4f;
-        this.p.setColor(-45149);
-        this.p.setAlpha((int) ((Math.sin(this.time * 2.0f) * 25.0d) + 40.0d));
         float f5 = f2 + (f / 2.0f);
-        canvas.drawCircle(f4, f5, 0.62f * f, this.p);
-        this.p.setAlpha(255);
+        float ovlIn = ovlOpenT(500.0f);
+        float ovlInE = 1.0f - ((1.0f - ovlIn) * (1.0f - ovlIn) * (1.0f - ovlIn));
+        ovlRays(canvas, f4, f5, f * 0.85f * ovlInE, 16, this.time * 9.0f, 0.07f, -25909, 34);
+        ovlRays(canvas, f4, f5, f * 0.7f * ovlInE, 10, this.time * -14.0f, 0.05f, -1, 22);
+        ovlGlow(canvas, f4, f5, f * 0.78f, -45149, (int) ((Math.sin(this.time * 2.0f) * 25.0d) + 95.0d));
+        this.ovlS.setStyle(Paint.Style.STROKE);
+        this.ovlS.setStrokeWidth(Math.max(1.0f, this.pad * 0.2f));
+        this.ovlS.setColor(-25909);
+        this.ovlS.setAlpha((int) (90.0f * ovlInE));
+        canvas.drawCircle(f4, f5, f * 0.56f, this.ovlS);
+        this.ovlS.setAlpha((int) (45.0f * ovlInE));
+        canvas.drawCircle(f4, f5, f * 0.6f, this.ovlS);
+        this.ovlP.setStyle(Paint.Style.FILL);
+        this.ovlP.setColor(-16777216);
+        this.ovlP.setAlpha(80);
+        this.ovlR.set(f4 - (f * 0.32f), (f2 + f) - (this.pad * 0.6f), (f * 0.32f) + f4, f2 + f + (this.pad * 0.6f));
+        canvas.drawOval(this.ovlR, this.ovlP);
         float f6 = f2 + f;
         blit(canvas, bitmap, f4, sin + f6 + (((f3 - 1.0f) * f) / 2.0f), (f / bitmap.getWidth()) * f3, 1.0f, 1.0f, this.bp);
         for (int i = OV_NONE; i < 6; i++) {
             double d = (this.time * 0.7d) + ((i * 3.141592653589793d) / 3.0d);
             float cos = (((float) Math.cos(d)) * f * 0.56f) + f4;
             float sin2 = (((float) Math.sin(d)) * f * 0.56f) + f5;
-            this.p.setColor(-25909);
-            this.p.setAlpha((int) ((Math.sin((this.time * 4.0f) + i) * 100.0d) + 150.0d));
-            float f7 = this.pad;
-            canvas.drawRect(cos - (f7 * 0.35f), sin2 - (f7 * 0.35f), (f7 * 0.35f) + cos, sin2 + (f7 * 0.35f), this.p);
+            float ovlTw = (float) Math.sin((this.time * 4.0f) + i);
+            ovlSpark(canvas, cos, sin2, this.pad * ((ovlTw * 0.3f) + 0.75f), i % 2 == 0 ? -25909 : -5720, (int) ((ovlTw * 100.0f) + 150.0f));
         }
         this.p.setAlpha(255);
         this.tp.setTextAlign(Paint.Align.CENTER);
         this.tp.setColor(-25909);
         this.tp.setTextSize(this.pad * 3.0f);
         this.tp.setFakeBoldText(true);
-        canvas.drawText(COMP_NAME[this.portraitWho], f4, f6 + (this.pad * 5.0f), this.tp);
+        ovlTitle(canvas, COMP_NAME[this.portraitWho], f4, f6 + (this.pad * 5.0f), 0.0f, -45149);
         this.tp.setFakeBoldText(false);
         this.tp.setColor(-4609816);
         this.tp.setTextSize(this.pad * 1.7f);
@@ -8781,16 +9507,31 @@ public class GameView extends View implements Runnable {
         float f9 = f6 + (12.6f * f8);
         float f10 = min / 2.0f;
         this.r.set(f4 - f10, f9, f10 + f4, (f8 * 3.6f) + f9);
-        this.p.setColor(-1);
         RectF rectF = this.r;
         float f11 = this.pad;
+        this.ovlP.setStyle(Paint.Style.FILL);
+        this.ovlP.setColor(-16777216);
+        this.ovlP.setAlpha(110);
+        this.ovlR.set(rectF.left, rectF.top + (f11 * 0.4f), rectF.right, rectF.bottom + (f11 * 0.4f));
+        canvas.drawRoundRect(this.ovlR, f11 * 1.5f, f11 * 1.5f, this.ovlP);
+        this.p.setColor(-1);
         canvas.drawRoundRect(rectF, f11 * 1.5f, f11 * 1.5f, this.p);
-        Path path = new Path();
-        path.moveTo(f4 - this.pad, f9);
-        path.lineTo(this.pad + f4, f9);
+        this.ovlS.setStyle(Paint.Style.STROKE);
+        this.ovlS.setStrokeWidth(Math.max(1.0f, f11 * 0.18f));
+        this.ovlS.setColor(-25909);
+        this.ovlS.setAlpha(200);
+        canvas.drawRoundRect(rectF, f11 * 1.5f, f11 * 1.5f, this.ovlS);
+        Path path = this.ovlPath2;
+        path.reset();
+        path.moveTo(f4 - this.pad, (this.pad * 0.2f) + f9);
+        path.lineTo(this.pad + f4, (this.pad * 0.2f) + f9);
         path.lineTo(f4, f9 - (this.pad * 1.3f));
         path.close();
         canvas.drawPath(path, this.p);
+        this.ovlP.setColor(-25909);
+        this.ovlP.setAlpha(70);
+        this.ovlR.set(rectF.left + (f11 * 0.3f), rectF.bottom - (f11 * 0.7f), rectF.right - (f11 * 0.3f), rectF.bottom - (f11 * 0.25f));
+        canvas.drawRoundRect(this.ovlR, f11 * 0.4f, f11 * 0.4f, this.ovlP);
         this.tp.setColor(-14017990);
         String str = this.portraitLine;
         float f12 = this.pad;
@@ -9114,6 +9855,14 @@ public class GameView extends View implements Runnable {
        this.p.setAlpha((int)(var9 * var7 * 255.0F));
        var1.drawRect(0.0F, 0.0F, (float)this.W, (float)this.H, this.p);
        this.p.setAlpha(255);
+       if (this.W > 0 && this.H > 0) {
+          this.ovlEnsureBack();
+          this.ovlBackP.setShader(this.ovlVigSh);
+          this.ovlBackP.setAlpha((int)(var9 * var7 * 1.25F * 255.0F));
+          var1.drawRect(0.0F, 0.0F, (float)this.W, (float)this.H, this.ovlBackP);
+          this.ovlBackP.setShader(null);
+       }
+
        var9 = (float)this.W / 2.0F;
        var7 = (float)this.H * 0.36F;
        float var14 = Math.min(1.0F, var13 / 0.8F);
@@ -9142,7 +9891,9 @@ public class GameView extends View implements Runnable {
        int var17 = REL_COLOR[this.relGetIdx];
        if (!this.relFly && var14 > 0.5F) {
           var10 = Math.min(1.0F, (var14 - 0.5F) * 2.0F);
-          Path var18 = new Path();
+          this.ovlRays(var1, var9, var7, this.pad * 22.0F * var8 * var10, 18, this.time * -12.0F, 0.05F, -1, (int)(34.0F * var10));
+          this.ovlGlow(var1, var9, var7, this.pad * 18.0F * var8, var17, (int)(120.0F * var10));
+          Path var18 = this.ovlPath2;
           var1.save();
           var1.rotate(this.time * 25.0F, var9, var7);
 
@@ -9162,6 +9913,26 @@ public class GameView extends View implements Runnable {
 
           var1.restore();
           this.p.setAlpha(255);
+       }
+
+       if (!this.relFly && var13 > 0.75F && var13 < 1.5F) {
+          float ovlK = (var13 - 0.75F) / 0.75F;
+          float ovlE = 1.0F - (1.0F - ovlK) * (1.0F - ovlK);
+          this.ovlShock(var1, var9, var7, this.pad * (4.0F + 20.0F * ovlE), this.pad * 0.9F * (1.0F - ovlK) + 1.0F, var17, (int)(230.0F * (1.0F - ovlK)));
+          this.ovlBurst(var1, var9, var7, this.pad * (5.0F + 10.0F * ovlE), this.pad * (8.0F + 16.0F * ovlE), 16, 11.0F, -1, (int)(200.0F * (1.0F - ovlK)), this.pad * 0.35F);
+          if (ovlK < 0.2F) {
+             this.ovlGlow(var1, var9, var7, this.pad * 14.0F, -1, (int)(220.0F * (1.0F - ovlK / 0.2F)));
+          }
+       }
+
+       if (this.relFly) {
+          for (int ovlT = 1; ovlT <= 5; ovlT++) {
+             float ovlQ = Math.max(0.0F, var6 - (float)ovlT * 0.06F);
+             float ovlQe = 1.0F - (1.0F - ovlQ) * (1.0F - ovlQ);
+             float ovlTx = (float)this.W / 2.0F + (this.relicBtn.centerX() - (float)this.W / 2.0F) * ovlQe;
+             float ovlTy = (float)this.H * 0.36F + (this.relicBtn.centerY() - (float)this.H * 0.36F) * ovlQe;
+             this.ovlSpark(var1, ovlTx, ovlTy, this.pad * (1.2F - (float)ovlT * 0.17F), var17, (int)((1.0F - var6) * (float)(255 - ovlT * 40)));
+          }
        }
 
        for (int var37 = 3; var37 >= 1; var37--) {
@@ -9189,7 +9960,13 @@ public class GameView extends View implements Runnable {
              var6 = this.pad * ((float)Math.sin((double)(var6 * 4.0F + (float)var38)) * 1.5F + 9.0F) * var8;
              this.p.setColor(-3392);
              this.p.setAlpha((int)(Math.min(1.0F, var13 * 2.0F) * 200.0F));
-             var1.drawCircle((float)Math.cos(var19) * var6 + var9, (float)Math.sin(var19) * var6 + var7, this.pad * 0.35F, this.p);
+             float ovlSx = (float)Math.cos(var19) * var6 + var9;
+             float ovlSy = (float)Math.sin(var19) * var6 + var7;
+             if (var38 % 3 == 0) {
+                this.ovlSpark(var1, ovlSx, ovlSy, this.pad * (0.6F + 0.3F * (float)Math.sin((double)(this.time * 6.0F + (float)var38))), -3392, (int)(Math.min(1.0F, var13 * 2.0F) * 230.0F));
+             } else {
+                var1.drawCircle(ovlSx, ovlSy, this.pad * 0.35F, this.p);
+             }
           }
        }
 
@@ -9214,11 +9991,13 @@ public class GameView extends View implements Runnable {
              var44 = "НОВАЯ РЕЛИКВИЯ!";
           }
 
-          var1.drawText(var44, (float)this.W / 2.0F, (float)this.H * 0.18F, this.tp);
+          this.tp.setTextSize(this.pad * 3.0F * (1.0F + 0.35F * (1.0F - var6) * (1.0F - var6)));
+          this.ovlTitle(var1, var44, (float)this.W / 2.0F, (float)this.H * 0.18F, 0.0F, -26051);
+          this.ovlDivider(var1, (float)this.W / 2.0F, (float)this.H * 0.18F + this.pad * 1.8F, (float)this.W * 0.3F * var6, -11430, var39);
           this.tp.setTextSize(this.pad * 2.8F);
           this.tp.setColor(var17);
           this.tp.setAlpha(var39);
-          var1.drawText(REL_NAME[this.relGetIdx], (float)this.W / 2.0F, (float)this.H * 0.5F, this.tp);
+          this.ovlTitle(var1, REL_NAME[this.relGetIdx], (float)this.W / 2.0F, (float)this.H * 0.5F, 0.0F, var17);
           this.tp.setFakeBoldText(false);
           this.tp.setTextSize(this.pad * 2.0F);
           this.tp.setColor(-1);
@@ -9252,16 +10031,29 @@ public class GameView extends View implements Runnable {
         String str;
         String str2;
         String str3;
+        float ovlA = ovlOpenT(220.0f);
+        ovlFrame(canvas, this.pad * 1.4f, this.H * 0.07f, this.W - (this.pad * 1.4f), this.H * 0.925f, -7569238, ovlA);
         this.tp.setTextAlign(Paint.Align.CENTER);
         this.tp.setColor(-1);
         float f = 3.2f;
         this.tp.setTextSize(this.pad * 3.2f);
         this.tp.setFakeBoldText(true);
-        canvas.drawText("⚙ Настройки", this.W / 2.0f, this.H * 0.13f, this.tp);
+        float ovlGx = (this.W / 2.0f) - (this.tp.measureText("⚙ Настройки") / 2.0f) + (this.tp.getTextSize() * 0.45f);
+        ovlTitle(canvas, "⚙ Настройки", this.W / 2.0f, this.H * 0.13f, 0.0f, -8395009);
         this.tp.setFakeBoldText(false);
+        ovlGlow(canvas, ovlGx, (this.H * 0.13f) - (this.pad * 1.1f), this.pad * 2.5f, -8395009, (int) ((Math.sin(this.time * 2.0f) * 15.0d) + 35.0d));
+        ovlDivider(canvas, this.W / 2.0f, (this.H * 0.13f) + (this.pad * 1.6f), this.W * 0.25f, -7569238, (int) (ovlA * 255.0f));
         String[] strArr = {"🎵 Музыка", "🔊 Звуки", "📳 Вибрация", "🔢 Цифры урона", "📤 Скопировать код сохранения", "📥 Загрузить сохранение", "🗑 Сбросить прогресс"};
         int i = 4;
         boolean[] zArr = {this.optMusic, this.optSfx, this.optVib, this.optNum};
+        float ovlDt = this.ovlSwT < 0.0f ? 1.0f : Math.max(0.0f, Math.min(1.0f, (this.time - this.ovlSwT) * 14.0f));
+        if (this.ovlSwT < 0.0f || this.time < this.ovlSwT || this.time - this.ovlSwT > 0.5f) {
+            ovlDt = 1.0f;
+        }
+        this.ovlSwT = this.time;
+        for (int ovlK = 0; ovlK < 4; ovlK++) {
+            this.ovlSw[ovlK] += ((zArr[ovlK] ? 1.0f : 0.0f) - this.ovlSw[ovlK]) * ovlDt;
+        }
         int i2 = this.H;
         float f2 = i2 * 0.07f;
         float f3 = i2 * 0.014f;
@@ -9278,10 +10070,24 @@ public class GameView extends View implements Runnable {
             RectF rectF = rectFArr[i3];
             float f5 = this.pad;
             rectF.set(f5 * 3.0f, f4, this.W - (f5 * 3.0f), f4 + f2);
-            this.p.setColor(i3 == 6 ? -11920854 : i3 >= i ? -13753520 : -14411203);
+            int ovlRc = i3 == 6 ? -11920854 : i3 >= i ? -13753520 : -14411203;
             RectF rectF2 = this.setRows[i3];
             float f6 = this.pad;
-            canvas.drawRoundRect(rectF2, f6 * 1.4f, f6 * 1.4f, this.p);
+            if (i3 == 6) {
+                ovlGlow(canvas, rectF2.centerX(), rectF2.centerY(), rectF2.width() * 0.55f, -4703670, (int) ((Math.sin(this.time * 2.5f) * 15.0d) + 35.0d));
+            }
+            panel(canvas, rectF2, f6 * 1.4f, ovlRc);
+            this.ovlS.setStyle(Paint.Style.STROKE);
+            this.ovlS.setStrokeWidth(Math.max(1.0f, f6 * 0.14f));
+            this.ovlS.setColor(i3 == 6 ? -30070 : i3 < i ? (zArr[i3] ? -12673970 : -11911072) : -8395009);
+            this.ovlS.setAlpha(i3 == 6 ? (int) ((Math.sin(this.time * 2.5f) * 40.0d) + 120.0d) : 90);
+            canvas.drawRoundRect(rectF2, f6 * 1.4f, f6 * 1.4f, this.ovlS);
+            if (i3 < i) {
+                this.ovlP.setStyle(Paint.Style.FILL);
+                this.ovlP.setColor(zArr[i3] ? -12673970 : -11911072);
+                this.ovlP.setAlpha(230);
+                canvas.drawRect(rectF2.left + (f6 * 0.5f), rectF2.top + (f6 * 1.0f), rectF2.left + (f6 * 0.85f), rectF2.bottom - (f6 * 1.0f), this.ovlP);
+            }
             this.tp.setTextAlign(i3 < i ? Paint.Align.LEFT : Paint.Align.CENTER);
             this.tp.setTextSize(this.pad * 2.0f);
             this.tp.setColor(i3 == 6 ? -30070 : -1);
@@ -9297,10 +10103,7 @@ public class GameView extends View implements Runnable {
                 float centerY = this.setRows[i3].centerY() - f11;
                 float f12 = f8 + f10;
                 this.r.set(f10, centerY, f12, centerY + f9);
-                this.p.setColor(zArr[i3] ? -12673970 : -11911072);
-                canvas.drawRoundRect(this.r, f11, f11, this.p);
-                this.p.setColor(-1);
-                canvas.drawCircle(zArr[i3] ? f12 - f11 : f10 + f11, centerY + f11, f9 * 0.4f, this.p);
+                ovlSwitch(canvas, this.r, Math.max(0.0f, Math.min(1.0f, this.ovlSw[i3])));
             }
             f4 += f2 + f3;
             i3++;
@@ -9341,10 +10144,26 @@ public class GameView extends View implements Runnable {
             float f16 = this.pad;
             int i7 = this.H;
             rectF3.set(f16 * 3.0f, i7 * 0.3f, this.W - (f16 * 3.0f), i7 * 0.62f);
-            this.p.setColor(-14411203);
-            RectF rectF4 = this.r;
-            float f17 = this.pad;
-            canvas.drawRoundRect(rectF4, f17 * 2.0f, f17 * 2.0f, this.p);
+            int ovlAc = this.setAsk == 1 ? -8395009 : -30070;
+            ovlGlow(canvas, this.r.centerX(), this.r.centerY(), this.r.width() * 0.7f, ovlAc, (int) ((Math.sin(this.time * 2.5f) * 12.0d) + 40.0d));
+            ovlFrame(canvas, this.r.left, this.r.top, this.r.right, this.r.bottom, ovlAc, 1.0f);
+            if (this.setAsk != 1) {
+                float ovlWx = this.W / 2.0f;
+                float ovlWy = (this.H * 0.3f) + (this.pad * 2.6f);
+                float ovlWs = this.pad * ((((float) Math.sin(this.time * 6.0f)) * 0.08f) + 1.0f);
+                this.ovlPath.reset();
+                this.ovlPath.moveTo(ovlWx, ovlWy - (ovlWs * 1.3f));
+                this.ovlPath.lineTo((ovlWs * 1.4f) + ovlWx, (ovlWs * 1.1f) + ovlWy);
+                this.ovlPath.lineTo(ovlWx - (ovlWs * 1.4f), (ovlWs * 1.1f) + ovlWy);
+                this.ovlPath.close();
+                this.ovlP.setStyle(Paint.Style.FILL);
+                this.ovlP.setColor(-30070);
+                this.ovlP.setAlpha(230);
+                canvas.drawPath(this.ovlPath, this.ovlP);
+                this.ovlP.setColor(-15069648);
+                canvas.drawRect(ovlWx - (ovlWs * 0.14f), ovlWy - (ovlWs * 0.5f), (ovlWs * 0.14f) + ovlWx, (ovlWs * 0.4f) + ovlWy, this.ovlP);
+                canvas.drawRect(ovlWx - (ovlWs * 0.14f), (ovlWs * 0.6f) + ovlWy, (ovlWs * 0.14f) + ovlWx, (ovlWs * 0.85f) + ovlWy, this.ovlP);
+            }
             int i8 = this.setAsk;
             if (i8 == 1) {
                 str3 = codeInfo(this.pendingImport) + ". Текущий прогресс заменится.";
@@ -9375,14 +10194,8 @@ public class GameView extends View implements Runnable {
             float f19 = this.pad;
             int i13 = this.H;
             rectF6.set((i12 / 2.0f) + f19, i13 * 0.5f, i12 - (f19 * 5.0f), i13 * 0.58f);
-            this.p.setColor(-12963760);
-            RectF rectF7 = this.askNo;
-            float f20 = this.pad;
-            canvas.drawRoundRect(rectF7, f20 * 1.5f, f20 * 1.5f, this.p);
-            this.p.setColor(this.setAsk == 1 ? -12673970 : -4703670);
-            RectF rectF8 = this.askYes;
-            float f21 = this.pad;
-            canvas.drawRoundRect(rectF8, f21 * 1.5f, f21 * 1.5f, this.p);
+            ovlButton(canvas, this.askNo, -12963760, false);
+            ovlButton(canvas, this.askYes, this.setAsk == 1 ? -12673970 : -4703670, true);
             this.tp.setColor(-1);
             this.tp.setTextSize(this.pad * 2.1f);
             canvas.drawText("Отмена", this.askNo.centerX(), this.askNo.centerY() + (this.pad * 0.75f), this.tp);
@@ -9403,6 +10216,43 @@ public class GameView extends View implements Runnable {
           this.p.setAlpha((int)(Math.min(1.0F, var8 * 3.0F) * 110.0F));
           var1.drawRect(0.0F, this.battleT, (float)this.W, this.battleB, this.p);
           this.p.setAlpha(255);
+       }
+
+       float ovlIn = Math.min(1.0F, var8 * 4.0F);
+       float ovlOut = Math.max(0.0F, Math.min(1.0F, (SUPER_END - var8) * 3.0F));
+       float ovlE = ovlIn * ovlOut;
+       int ovlEc = this.superType == 0 ? -11430 : (this.superType == 1 ? -5213953 : EL_COLOR[(int)(this.time * 6.0F) % 4]);
+       this.ovlP.setStyle(Style.FILL);
+       for (int ovlK = 0; ovlK < 4; ovlK++) {
+          float ovlH = this.pad * 0.35F * (float)(ovlK + 1);
+          this.ovlP.setColor(ovlEc);
+          this.ovlP.setAlpha((int)(ovlE * (float)(110 - ovlK * 25)));
+          var1.drawRect(0.0F, this.battleT, (float)this.W, this.battleT + ovlH, this.ovlP);
+          var1.drawRect(0.0F, this.battleB - ovlH, (float)this.W, this.battleB, this.ovlP);
+       }
+
+       this.ovlP.setColor(-1);
+       this.ovlP.setAlpha((int)(ovlE * 200.0F));
+       var1.drawRect(0.0F, this.battleT, (float)this.W, this.battleT + Math.max(1.0F, this.pad * 0.15F), this.ovlP);
+       var1.drawRect(0.0F, this.battleB - Math.max(1.0F, this.pad * 0.15F), (float)this.W, this.battleB, this.ovlP);
+       if (var16 < 0) {
+          float ovlBh = this.battleB - this.battleT;
+          for (int ovlK = 0; ovlK < 16; ovlK++) {
+             float ovlSp = 1.6F + ovlHash(ovlK, 61) * 1.6F;
+             float ovlLen = (float)this.W * (0.12F + ovlHash(ovlK, 62) * 0.22F);
+             float ovlX = (float)this.W + ovlLen - (((this.time * ovlSp) + ovlHash(ovlK, 63)) % 1.0F) * ((float)this.W + ovlLen * 2.0F);
+             float ovlY = this.battleT + ovlBh * (0.06F + ovlHash(ovlK, 64) * 0.88F);
+             float ovlTh = Math.max(1.0F, this.pad * (0.1F + ovlHash(ovlK, 65) * 0.18F));
+             this.ovlP.setColor(ovlK % 3 == 0 ? ovlEc : -1);
+             this.ovlP.setAlpha((int)(ovlIn * (40.0F + 60.0F * ovlHash(ovlK, 66))));
+             var1.drawRect(ovlX, ovlY - ovlTh, ovlX + ovlLen, ovlY + ovlTh, this.ovlP);
+          }
+
+          float ovlHx = this.heroX + 13.0F * this.hu;
+          float ovlHy = this.groundY - 26.0F * this.hu;
+          float ovlCh = Math.min(1.0F, var8 / 1.2F);
+          this.ovlGlow(var1, ovlHx, ovlHy, this.pad * (4.0F + 6.0F * ovlCh) * (1.0F + 0.08F * (float)Math.sin((double)(this.time * 30.0F))), ovlEc, (int)(ovlIn * 150.0F));
+          this.ovlRays(var1, ovlHx, ovlHy, this.pad * (5.0F + 9.0F * ovlCh), 10, this.time * 220.0F, 0.06F, -1, (int)(ovlIn * 60.0F));
        }
 
        float var5 = this.heroX;
@@ -9451,7 +10301,8 @@ public class GameView extends View implements Runnable {
                 }
 
                 var4 = var6 * var4;
-                Path var17 = new Path();
+                Path var17 = this.ovlPath;
+                var17.reset();
                 int var15;
                 if (var13 % 2 == 1) {
                    var15 = 1;
@@ -9483,8 +10334,10 @@ public class GameView extends View implements Runnable {
                 }
 
                 var17.quadTo(var12 + var7 * 0.2F, this.mobY + var4 * 0.5F, var10 + var6, var11 + var4 * 0.7F);
-                PathMeasure var18 = new PathMeasure(var17, false);
-                var17 = new Path();
+                PathMeasure var18 = this.ovlPM;
+                var18.setPath(var17, false);
+                var17 = this.ovlPath2;
+                var17.reset();
                 var18.getSegment(0.0F, var18.getLength() * var9, var17, true);
                 Paint var83 = this.p;
                 if (var75) {
@@ -9503,10 +10356,16 @@ public class GameView extends View implements Runnable {
                    var4 = 2.2F;
                 }
 
+                var84.setStrokeWidth(var6 * var4 * 1.9F);
+                int ovlSa = this.p.getAlpha();
+                this.p.setAlpha(ovlSa / 3);
+                var1.drawPath(var17, this.p);
+                this.p.setAlpha(ovlSa);
                 var84.setStrokeWidth(var6 * var4);
                 var1.drawPath(var17, this.p);
                 this.p.setColor(-1);
                 this.p.setAlpha((int)(var5 * 255.0F));
+                float ovlFade = var5;
                 Paint var85 = this.p;
                 var5 = this.pad;
                 if (var75) {
@@ -9517,6 +10376,9 @@ public class GameView extends View implements Runnable {
 
                 var85.setStrokeWidth(var5 * var4);
                 var1.drawPath(var17, this.p);
+                if (var18.getPosTan(var18.getLength() * var9, this.ovlTip, null)) {
+                   this.ovlSpark(var1, this.ovlTip[0], this.ovlTip[1], this.pad * (var75 ? 2.4F : 1.6F), var75 ? -26051 : -11430, (int)(255.0F * ovlFade));
+                }
              }
 
              var13++;
@@ -9551,7 +10413,7 @@ public class GameView extends View implements Runnable {
           for (int var69 = 0; var69 < 8; var69++) {
              double var2 = (double)this.time * 1.5 + (double)var69 * Math.PI / 4.0;
              var1.drawText(
-                new String[]{"✦", "◆", "✧", "❖", "✦", "◇", "✧", "❖"}[var69],
+                ovlHolyGlyph[var69],
                 this.mobX + (float)Math.cos(var2) * var5 * 0.85F,
                 this.groundY + (float)Math.sin(var2) * var4 * 0.85F + this.pad * 0.6F,
                 this.tp
@@ -9567,6 +10429,14 @@ public class GameView extends View implements Runnable {
              }
 
              var5 = this.mobR * (1.4F * var4 + 0.4F) * ((float)Math.sin((double)(this.time * 40.0F)) * 0.08F + 1.0F);
+             this.ovlGlow(var1, this.mobX, this.groundY, var5 * 2.6F, -5213953, (int)(160.0F * var4));
+             for (int ovlK = 0; ovlK < 10; ovlK++) {
+                float ovlPh = (this.time * (0.9F + ovlHash(ovlK, 71)) + ovlHash(ovlK, 72)) % 1.0F;
+                float ovlPx = this.mobX + (ovlHash(ovlK, 73) - 0.5F) * var5 * 1.8F;
+                float ovlPy = this.groundY - ovlPh * (this.groundY - this.battleT);
+                this.ovlSpark(var1, ovlPx, ovlPy, this.pad * 0.7F * (1.0F - ovlPh), -2045697, (int)(220.0F * var4 * (1.0F - ovlPh)));
+             }
+
              this.p.setColor(-5213953);
              this.p.setAlpha((int)(110.0F * var4));
              var6 = this.mobX;
@@ -9647,26 +10517,19 @@ public class GameView extends View implements Runnable {
              var80 = "\ud83c\udf00 ЛУЧ СТИХИЙ!";
           }
 
+          float ovlTs = (float)Math.sin((double)(this.time * 30.0F)) * this.pad * 0.15F * (1.0F - var4);
           this.tp.setColor(-15331286);
           var4 = (float)this.W / 2.0F;
           var5 = this.pad;
-          var1.drawText(var80, var4 + var5 * 0.3F, this.battleT + var5 * 6.3F, this.tp);
+          var1.drawText(var80, var4 + var5 * 0.3F + ovlTs, this.battleT + var5 * 6.3F, this.tp);
           this.tp.setColor(-11430);
-          var1.drawText(var80, (float)this.W / 2.0F, this.battleT + this.pad * 6.0F, this.tp);
-          StringBuilder var86 = new StringBuilder();
-
-          for (int var73 = 0; var73 < 3; var73++) {
-             if (var73 < this.superStars) {
-                var80 = "★";
-             } else {
-                var80 = "☆";
-             }
-
-             var86.append(var80);
-          }
-
+          this.tp.setShadowLayer(this.pad * 1.3F, 0.0F, 0.0F, -26051);
+          var1.drawText(var80, (float)this.W / 2.0F + ovlTs, this.battleT + this.pad * 6.0F, this.tp);
+          this.tp.clearShadowLayer();
           this.tp.setTextSize(this.pad * 2.4F);
-          var1.drawText(var86.toString(), (float)this.W / 2.0F, this.battleT + this.pad * 9.0F, this.tp);
+          this.tp.setShadowLayer(this.pad * 0.8F, 0.0F, 0.0F, -26051);
+          var1.drawText(ovlStarStr[Math.max(0, Math.min(3, this.superStars))], (float)this.W / 2.0F, this.battleT + this.pad * 9.0F, this.tp);
+          this.tp.clearShadowLayer();
           this.tp.setFakeBoldText(false);
        }
 
@@ -9678,6 +10541,20 @@ public class GameView extends View implements Runnable {
              this.p.setAlpha((int)(var4 * 220.0F));
              var1.drawRect(0.0F, this.battleT, (float)this.W, this.battleB, this.p);
              this.p.setAlpha(255);
+          }
+
+          if (var5 >= 0.0F && var5 < 0.7F) {
+             float ovlQ = var5 / 0.7F;
+             float ovlQe = 1.0F - (1.0F - ovlQ) * (1.0F - ovlQ);
+             int ovlHc = this.superType == 0 ? -11430 : (this.superType == 1 ? -5213953 : EL_COLOR[(int)(var5 * 20.0F) % 4]);
+             this.ovlGlow(var1, this.mobX, this.mobY, this.mobR * (2.0F + 2.0F * ovlQe), ovlHc, (int)(200.0F * (1.0F - ovlQ)));
+             this.ovlShock(var1, this.mobX, this.mobY, this.mobR * (0.6F + 3.2F * ovlQe), this.pad * 1.2F * (1.0F - ovlQ) + 1.0F, ovlHc, (int)(240.0F * (1.0F - ovlQ)));
+             if (ovlQ > 0.15F) {
+                float ovlQ2 = (ovlQ - 0.15F) / 0.85F;
+                this.ovlShock(var1, this.mobX, this.mobY, this.mobR * (0.4F + 2.2F * ovlQ2), this.pad * 0.6F * (1.0F - ovlQ2) + 1.0F, -1, (int)(180.0F * (1.0F - ovlQ2)));
+             }
+
+             this.ovlBurst(var1, this.mobX, this.mobY, this.mobR * (0.8F + 1.6F * ovlQe), this.mobR * (1.4F + 2.8F * ovlQe), 14, 7.0F, ovlHc, (int)(230.0F * (1.0F - ovlQ)), this.pad * 0.5F * (1.0F - ovlQ) + 1.0F);
           }
 
           if (var5 < 0.12F) {
