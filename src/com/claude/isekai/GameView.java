@@ -1974,11 +1974,10 @@ public class GameView extends View implements Runnable {
                     menuSpark(canvas, rectF.right - (f9 * 1.3f), rectF.top + (f9 * 1.1f), Math.max(1.0f, f9 * 0.2f), -11430, (int) (255.0f * tw));
                 }
             } else {
-                // locked: dimmed with a faint diagonal hatch
-                this.menuPath.reset();
-                this.menuPath.addRoundRect(rectF, f9, f9, Path.Direction.CW);
+                // locked: dimmed with a faint diagonal hatch (rect clip inset so its corners sit on the rounded edge)
+                float hin = f9 * 0.3f;
                 canvas.save();
-                canvas.clipPath(this.menuPath);
+                canvas.clipRect(rectF.left + hin, rectF.top + hin, rectF.right - hin, rectF.bottom - hin);
                 this.menuLine.setStyle(Paint.Style.STROKE);
                 this.menuLine.setStrokeWidth(Math.max(1.0f, f9 * 0.22f));
                 this.menuLine.setColor(0x14FFFFFF);
@@ -2172,9 +2171,41 @@ public class GameView extends View implements Runnable {
         canvas.restore();
     }
 
+    /** True when the string holds colour-emoji / symbol glyphs, which ignore the paint colour
+     *  (an offset "dark copy" of them would show up as a ghosted second emoji). */
+    static boolean gfxHasEmoji(String s) {
+        if (s == null) {
+            return false;
+        }
+        for (int k = 0; k < s.length(); k++) {
+            char ch = s.charAt(k);
+            if (Character.isSurrogate(ch) || (ch >= 0x2190 && ch <= 0x2BFF)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Emoji-safe drop shadow: one pass with a text shadow layer (the glyph mask is shadowed, not the colour bitmap). */
+    void hudShadowPass(Canvas canvas, String str, float f, float f2, float f3, int i, int i2, float max) {
+        this.tp.setColor(i);
+        this.tp.setAlpha(i2);
+        this.tp.setShadowLayer(Math.max(1.0f, this.pad * 0.12f), max, max, (((i2 * 200) / 255) << 24) | 0x0F0A1C);
+        if (f3 > 0.0f) {
+            drawFit(canvas, str, f, f2, f3);
+        } else {
+            canvas.drawText(str, f, f2, this.tp);
+        }
+        this.tp.clearShadowLayer();
+    }
+
     /** Text with a chunky pixel drop shadow, using tp's current size/align/typeface. */
     void hudText(Canvas canvas, String str, float f, float f2, int i, int i2) {
         float max = Math.max(1.0f, this.pad * 0.2f);
+        if (gfxHasEmoji(str)) {
+            hudShadowPass(canvas, str, f, f2, 0.0f, i, i2, max);
+            return;
+        }
         this.tp.setColor(-15791588);
         this.tp.setAlpha((i2 * 200) / 255);
         canvas.drawText(str, f + max, f2 + max, this.tp);
@@ -2186,6 +2217,10 @@ public class GameView extends View implements Runnable {
     /** drawFit with a pixel drop shadow. */
     void hudFitText(Canvas canvas, String str, float f, float f2, float f3, int i, int i2) {
         float max = Math.max(1.0f, this.pad * 0.2f);
+        if (gfxHasEmoji(str) && f3 > 0.0f) {
+            hudShadowPass(canvas, str, f, f2, f3, i, i2, max);
+            return;
+        }
         this.tp.setColor(-15791588);
         this.tp.setAlpha((i2 * 200) / 255);
         drawFit(canvas, str, f + max, f2 + max, f3);
@@ -7067,10 +7102,11 @@ public class GameView extends View implements Runnable {
         this.tp.setFakeBoldText(true);
         // title with a chunky drop shadow and a warm glow
         minisHalo(canvas, this.W / 2.0f, (this.H * 0.17f) - (this.pad * 1.0f), this.pad * 7.0f, -11430, 70.0f);
-        this.tp.setColor(-15331286);
-        canvas.drawText(MINI_NAME[this.miniType], (this.W / 2.0f) + (this.hu * 1.3f), (this.H * 0.17f) + (this.hu * 1.3f), this.tp);
+        // MINI_NAME starts with an emoji: shadow via the text shadow layer, not an offset copy (no ghosted emoji)
         this.tp.setColor(-11430);
+        this.tp.setShadowLayer(Math.max(1.0f, this.hu * 0.4f), this.hu * 1.3f, this.hu * 1.3f, -15331286);
         canvas.drawText(MINI_NAME[this.miniType], this.W / 2.0f, this.H * 0.17f, this.tp);
+        this.tp.clearShadowLayer();
         this.tp.setFakeBoldText(false);
         this.tp.setColor(-4609816);
         this.tp.setTextSize(this.pad * 1.8f);
@@ -8494,12 +8530,15 @@ public class GameView extends View implements Runnable {
     void ovlTitle(Canvas c, String s, float x, float y, float maxW, int glow) {
         int col = this.tp.getColor();
         float off = this.pad * 0.3f;
-        this.tp.setColor(-15725032);
-        this.tp.setAlpha(Color.alpha(col));
-        if (maxW > 0.0f) {
-            drawFit(c, s, x + off, y + off, maxW);
-        } else {
-            c.drawText(s, x + off, y + off, this.tp);
+        // the offset dark copy would ghost colour emoji (they ignore the paint colour); the glow alone carries those titles
+        if (!gfxHasEmoji(s)) {
+            this.tp.setColor(-15725032);
+            this.tp.setAlpha(Color.alpha(col));
+            if (maxW > 0.0f) {
+                drawFit(c, s, x + off, y + off, maxW);
+            } else {
+                c.drawText(s, x + off, y + off, this.tp);
+            }
         }
         this.tp.setColor(col);
         this.tp.setShadowLayer(this.pad * 1.1f, 0.0f, 0.0f, (glow & 16777215) | (((Color.alpha(glow) * Color.alpha(col)) / 255) << 24));
@@ -11215,16 +11254,20 @@ public class GameView extends View implements Runnable {
         c.drawRoundRect(rr, rad, rad, this.menuFill);
         menuGlossRR(c, rr, rad, slot, 255);
         if (strip) {
-            this.menuPath.reset();
-            this.menuPath.addRoundRect(rr, rad, rad, Path.Direction.CW);
+            // (strip ∩ rounded card) drawn as rect-clip + round rect: same pixels as a clipPath, but a cheap
+            // scissor clip instead of a stencil clip per card on HW-accelerated API 21-27
             c.save();
-            c.clipPath(this.menuPath);
+            c.clipRect(rr.left, rr.top, rr.left + pd * 0.5f, rr.bottom);
             this.menuFill.setColor(menuAlpha(accent, 200));
-            c.drawRect(rr.left, rr.top, rr.left + pd * 0.5f, rr.bottom, this.menuFill);
+            c.drawRoundRect(rr, rad, rad, this.menuFill);
+            c.clipRect(rr.left, rr.top, rr.left + pd * 0.5f, rr.top + pd * 0.35f);
             this.menuFill.setColor(menuAlpha(menuMix(accent, -1, 0.5f), 150));
-            c.drawRect(rr.left, rr.top, rr.left + pd * 0.5f, rr.top + pd * 0.35f, this.menuFill);
+            c.drawRoundRect(rr, rad, rad, this.menuFill);
+            c.restore();
+            c.save();
+            c.clipRect(rr.left + pd * 0.5f, rr.top, rr.left + pd * 0.7f, rr.bottom);
             this.menuFill.setColor(0x40000000);
-            c.drawRect(rr.left + pd * 0.5f, rr.top, rr.left + pd * 0.7f, rr.bottom, this.menuFill);
+            c.drawRoundRect(rr, rad, rad, this.menuFill);
             c.restore();
         }
         float sw = Math.max(1f, pd * 0.14f);
